@@ -21,7 +21,7 @@
         "php": "^8.0",
         "ext-mbstring": "*",
         "ext-pdo": "*",
-        "terabytesoft/db": "^3.0",
+        "terabytesoft/db": "@dev",
         "yiisoft/arrays": "^2.0",
         "yiisoft/strings": "^2.0"
     },
