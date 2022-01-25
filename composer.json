@@ -1,0 +1,55 @@
+{
+    "name": "terabytesoft/db-sqlite",
+    "type": "library",
+    "description": "Yii DataBase SQLite Extension",
+    "keywords": [
+        "yii",
+        "sqlite"
+    ],
+    "homepage": "http://www.yiiframework.com/",
+    "license": "BSD-3-Clause",
+    "support": {
+        "source": "https://github.com/yiisoft/db-sqlite",
+        "issues": "https://github.com/yiisoft/db-sqlite/issues",
+        "forum": "http://www.yiiframework.com/forum/",
+        "wiki": "http://www.yiiframework.com/wiki/",
+        "irc": "irc://irc.freenode.net/yii"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.0",
+        "ext-mbstring": "*",
+        "ext-pdo": "*",
+        "yiisoft/arrays": "^2.0",
+        "yiisoft/db": "dev-without-pdo as 3.0",
+        "yiisoft/strings": "^2.0"
+    },
+    "require-dev": {
+        "ext-json": "*",
+        "phpunit/phpunit": "^9.5",
+        "roave/infection-static-analysis-plugin": "^1.7",
+        "vimeo/psalm": "^4.4",
+        "yiisoft/aliases": "^1.1|^2.0",
+        "yiisoft/json": "^1.0",
+        "yiisoft/log": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Yiisoft\\Db\\Sqlite\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Yiisoft\\Db\\Sqlite\\Tests\\": "tests"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "3.0.x-dev"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
