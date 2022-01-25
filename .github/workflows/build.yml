@@ -23,7 +23,6 @@ jobs:
           - windows-latest
 
         php:
-          - 7.4
           - 8.0
 
     steps:
@@ -76,5 +75,12 @@ jobs:
       - name: Install dependencies with composer
         run: composer update --prefer-dist --no-interaction --no-progress --optimize-autoloader --ansi
 
-      - name: Run tests with phpunit
-        run: vendor/bin/phpunit --colors=always
+      - name: Run tests with phpunit with code coverage
+        run: vendor/bin/phpunit --coverage-clover=coverage.clover --colors=always
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
