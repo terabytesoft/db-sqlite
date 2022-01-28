@@ -23,6 +23,8 @@ final class ConnectionTest extends TestCase
 
     public function testConnection(): void
     {
+        var_dump($this->getConnection()->getServerVersion());
+        die;
         $this->assertIsObject($this->getConnection(true));
     }
 
