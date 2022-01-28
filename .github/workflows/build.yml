@@ -38,6 +38,7 @@ jobs:
           tools: composer:v2
         env:
           update: true
+        continue-on-error: true
 
       - name: Determine composer cache directory on Linux
         if: matrix.os == 'ubuntu-latest'
