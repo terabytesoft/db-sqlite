@@ -30,6 +30,8 @@ jobs:
           php-version: "${{ matrix.php }}"
           tools: composer:v2, cs2pr
           coverage: none
+        env:
+          update: true
 
       - name: Determine composer cache directory
         run: echo "COMPOSER_CACHE_DIR=$(composer config cache-dir)" >> $GITHUB_ENV
