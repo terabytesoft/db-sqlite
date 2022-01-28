@@ -11,7 +11,7 @@ jobs:
     name: PHP ${{ matrix.php }}-${{ matrix.os }}
 
     env:
-      extensions: pdo, pdo_sqlite
+      extensions: pdo, pdo_sqlite, sqlite3
 
     runs-on: ${{ matrix.os }}
 
@@ -60,3 +60,4 @@ jobs:
           vendor/bin/roave-infection-static-analysis-plugin -j2 --ignore-msi-with-no-mutations --only-covered
         env:
           STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}
+        continue-on-error: true
