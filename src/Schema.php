@@ -35,6 +35,51 @@ use function trim;
  *
  * @property string $transactionIsolationLevel The transaction isolation level to use for this transaction. This can be
  * either {@see Transaction::READ_UNCOMMITTED} or {@see Transaction::SERIALIZABLE}.
+ *
+ * @psalm-type Column = array<array-key, array{seqno:string, cid:string, name:string}>
+ *
+ * @psalm-type NormalizePragmaForeignKeyList = array<
+ *   string,
+ *   array<
+ *     array-key,
+ *     array{
+ *       id:string,
+ *       cid:string,
+ *       seq:string,
+ *       table:string,
+ *       from:string,
+ *       to:string,
+ *       on_update:string,
+ *       on_delete:string
+ *     }
+ *   >
+ * >
+ *
+ * @psalm-type PragmaForeignKeyList = array<
+ *   string,
+ *   array{
+ *     id:string,
+ *     cid:string,
+ *     seq:string,
+ *     table:string,
+ *     from:string,
+ *     to:string,
+ *     on_update:string,
+ *     on_delete:string
+ *   }
+ * >
+ *
+ * @psalm-type PragmaIndexInfo = array<array-key, array{seqno:string, cid:string, name:string}>
+ *
+ * @psalm-type PragmaIndexList = array<
+ *   array-key,
+ *   array{seq:string, name:string, unique:string, origin:string, partial:string}
+ * >
+ *
+ * @psalm-type PragmaTableInfo = array<
+ *   array-key,
+ *   array{cid:string, name:string, type:string, notnull:string, dflt_value:string|null, pk:string}
+ * >
  */
 final class Schema extends AbstractSchema implements ConstraintFinderInterface
 {
@@ -42,6 +87,8 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
 
     /**
      * @var array mapping from physical column types (keys) to abstract column types (values)
+     *
+     * @psalm-var array<array-key, string> $typeMap
      */
     private array $typeMap = [
         'tinyint' => self::TYPE_TINYINT,
@@ -100,9 +147,9 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     protected function findTableNames(string $schema = ''): array
     {
-        $sql = "SELECT DISTINCT tbl_name FROM sqlite_master WHERE tbl_name<>'sqlite_sequence' ORDER BY tbl_name";
-
-        return $this->getDb()->createCommand($sql)->queryColumn();
+        return $this->getDb()->createCommand(
+            "SELECT DISTINCT tbl_name FROM sqlite_master WHERE tbl_name<>'sqlite_sequence' ORDER BY tbl_name"
+        )->queryColumn();
     }
 
     /**
@@ -141,7 +188,9 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     protected function loadTablePrimaryKey(string $tableName): ?Constraint
     {
-        return $this->loadTableConstraints($tableName, 'primaryKey');
+        $tablePrimaryKey = $this->loadTableConstraints($tableName, 'primaryKey');
+
+        return $tablePrimaryKey instanceof Constraint ? $tablePrimaryKey : null;
     }
 
     /**
@@ -155,19 +204,17 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     protected function loadTableForeignKeys(string $tableName): array
     {
-        $foreignKeys = $this->getDb()->createCommand(
-            'PRAGMA FOREIGN_KEY_LIST (' . $this->quoteValue($tableName) . ')'
-        )->queryAll();
-
-        $foreignKeys = $this->normalizePdoRowKeyCase($foreignKeys, true);
-
-        $foreignKeys = ArrayHelper::index($foreignKeys, null, 'table');
-
-        ArraySorter::multisort($foreignKeys, 'seq', SORT_ASC, SORT_NUMERIC);
-
         $result = [];
+        /** @psalm-var PragmaForeignKeyList */
+        $foreignKeysList = $this->getPragmaForeignKeyList($tableName);
+        /** @psalm-var NormalizePragmaForeignKeyList */
+        $foreignKeysList = $this->normalizePdoRowKeyCase($foreignKeysList, true);
+        /** @psalm-var NormalizePragmaForeignKeyList */
+        $foreignKeysList = ArrayHelper::index($foreignKeysList, null, 'table');
+        ArraySorter::multisort($foreignKeysList, 'seq', SORT_ASC, SORT_NUMERIC);
 
-        foreach ($foreignKeys as $table => $foreignKey) {
+        /** @psalm-var NormalizePragmaForeignKeyList $foreignKeysList */
+        foreach ($foreignKeysList as $table => $foreignKey) {
             $fk = (new ForeignKeyConstraint())
                 ->columnNames(ArrayHelper::getColumn($foreignKey, 'from'))
                 ->foreignTableName($table)
@@ -188,11 +235,13 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      *
      * @throws Exception|InvalidArgumentException|InvalidConfigException|Throwable
      *
-     * @return IndexConstraint[] indexes for the given table.
+     * @return array|IndexConstraint[] indexes for the given table.
      */
     protected function loadTableIndexes(string $tableName): array
     {
-        return $this->loadTableConstraints($tableName, 'indexes');
+        $tableIndexes = $this->loadTableConstraints($tableName, 'indexes');
+
+        return is_array($tableIndexes) ? $tableIndexes : [];
     }
 
     /**
@@ -202,11 +251,13 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      *
      * @throws Exception|InvalidArgumentException|InvalidConfigException|Throwable
      *
-     * @return Constraint[] unique constraints for the given table.
+     * @return array|Constraint[] unique constraints for the given table.
      */
     protected function loadTableUniques(string $tableName): array
     {
-        return $this->loadTableConstraints($tableName, 'uniques');
+        $tableUniques = $this->loadTableConstraints($tableName, 'uniques');
+
+        return is_array($tableUniques) ? $tableUniques : [];
     }
 
     /**
@@ -220,46 +271,41 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     protected function loadTableChecks(string $tableName): array
     {
-        $sql = $this->getDb()->createCommand('SELECT `sql` FROM `sqlite_master` WHERE name = :tableName', [
-            ':tableName' => $tableName,
-        ])->queryScalar();
+        $sql = $this->getDb()->createCommand(
+            'SELECT `sql` FROM `sqlite_master` WHERE name = :tableName',
+            [':tableName' => $tableName],
+        )->queryScalar();
+
+        $sql = ($sql === false || $sql === null) ? '' : $sql;
 
         /** @var SqlToken[]|SqlToken[][]|SqlToken[][][] $code */
         $code = (new SqlTokenizer($sql))->tokenize();
-
         $pattern = (new SqlTokenizer('any CREATE any TABLE any()'))->tokenize();
-
-        if (!$code[0]->matches($pattern, 0, $firstMatchIndex, $lastMatchIndex)) {
-            return [];
-        }
-
-        $createTableToken = $code[0][$lastMatchIndex - 1];
         $result = [];
-        $offset = 0;
 
-        while (true) {
-            $pattern = (new SqlTokenizer('any CHECK()'))->tokenize();
+        if ($code[0] instanceof SqlToken && $code[0]->matches($pattern, 0, $firstMatchIndex, $lastMatchIndex)) {
+            $offset = 0;
+            $createTableToken = $code[0][(int) $lastMatchIndex - 1];
+            $sqlTokenizerAnyCheck = new SqlTokenizer('any CHECK()');
 
-            if (!$createTableToken->matches($pattern, $offset, $firstMatchIndex, $offset)) {
-                break;
-            }
-
-            $checkSql = $createTableToken[$offset - 1]->getSql();
-            $name = null;
-            $pattern = (new SqlTokenizer('CONSTRAINT any'))->tokenize();
-
-            if (
-                isset($createTableToken[$firstMatchIndex - 2])
-                && $createTableToken->matches($pattern, $firstMatchIndex - 2)
+            while (
+                $createTableToken instanceof SqlToken &&
+                $createTableToken->matches($sqlTokenizerAnyCheck->tokenize(), (int) $offset, $firstMatchIndex, $offset)
             ) {
-                $name = $createTableToken[$firstMatchIndex - 1]->getContent();
+                $name = null;
+                $checkSql = (string) $createTableToken[(int) $offset - 1];
+                $pattern = (new SqlTokenizer('CONSTRAINT any'))->tokenize();
+
+                if (
+                    isset($createTableToken[(int) $firstMatchIndex - 2])
+                    && $createTableToken->matches($pattern, (int) $firstMatchIndex - 2)
+                ) {
+                    $sqlToken = $createTableToken[(int) $firstMatchIndex - 1];
+                    $name = $sqlToken !== null ? $sqlToken->getContent() : null;
+                }
+
+                $result[] = (new CheckConstraint())->name($name)->expression($checkSql);
             }
-
-            $ck = (new CheckConstraint())
-                ->name($name)
-                ->expression($checkSql);
-
-            $result[] = $ck;
         }
 
         return $result;
@@ -317,28 +363,26 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     protected function findColumns(TableSchema $table): bool
     {
-        $sql = 'PRAGMA table_info(' . $this->quoteSimpleTableName($table->getName()) . ')';
-        $columns = $this->getDb()->createCommand($sql)->queryAll();
-
-        if (empty($columns)) {
-            return false;
-        }
+        /** @psalm-var PragmaTableInfo */
+        $columns = $this->getPragmaTableInfo($table->getName());
 
         foreach ($columns as $info) {
             $column = $this->loadColumnSchema($info);
             $table->columns($column->getName(), $column);
+
             if ($column->isPrimaryKey()) {
                 $table->primaryKey($column->getName());
             }
         }
 
-        $pk = $table->getPrimaryKey();
-        if (count($pk) === 1 && !strncasecmp($table->getColumn($pk[0])->getDbType(), 'int', 3)) {
+        $column = count($table->getPrimaryKey()) === 1 ? $table->getColumn((string) $table->getPrimaryKey()[0]) : null;
+
+        if ($column !== null && !strncasecmp($column->getDbType(), 'int', 3)) {
             $table->sequenceName('');
-            $table->getColumn($pk[0])->autoIncrement(true);
+            $column->autoIncrement(true);
         }
 
-        return true;
+        return !empty($columns);
     }
 
     /**
@@ -350,17 +394,18 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     protected function findConstraints(TableSchema $table): void
     {
-        $sql = 'PRAGMA foreign_key_list(' . $this->quoteSimpleTableName($table->getName()) . ')';
-        $keys = $this->getDb()->createCommand($sql)->queryAll();
+        /** @psalm-var PragmaForeignKeyList */
+        $foreignKeysList = $this->getPragmaForeignKeyList($table->getName());
 
-        foreach ($keys as $key) {
-            $id = (int) $key['id'];
+        foreach ($foreignKeysList as $foreignKey) {
+            $id = (int) $foreignKey['id'];
             $fk = $table->getForeignKeys();
+
             if (!isset($fk[$id])) {
-                $table->foreignKey($id, ([$key['table'], $key['from'] => $key['to']]));
+                $table->foreignKey($id, ([$foreignKey['table'], $foreignKey['from'] => $foreignKey['to']]));
             } else {
                 /** composite FK */
-                $table->compositeFK($id, $key['from'], $key['to']);
+                $table->compositeFK($id, $foreignKey['from'], $foreignKey['to']);
             }
         }
     }
@@ -385,15 +430,14 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     public function findUniqueIndexes(TableSchema $table): array
     {
-        $sql = 'PRAGMA index_list(' . $this->quoteSimpleTableName($table->getName()) . ')';
-        $indexes = $this->getDb()->createCommand($sql)->queryAll();
+        /** @psalm-var PragmaIndexList */
+        $indexList = $this->getPragmaIndexList($table->getName());
         $uniqueIndexes = [];
 
-        foreach ($indexes as $index) {
+        foreach ($indexList as $index) {
             $indexName = $index['name'];
-            $indexInfo = $this->getDb()->createCommand(
-                'PRAGMA index_info(' . $this->quoteValue($index['name']) . ')'
-            )->queryAll();
+            /** @psalm-var PragmaIndexInfo */
+            $indexInfo = $this->getPragmaIndexInfo($index['name']);
 
             if ($index['unique']) {
                 $uniqueIndexes[$indexName] = [];
@@ -412,13 +456,15 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      * @param array $info column information.
      *
      * @return ColumnSchema the column schema object.
+     *
+     * @psalm-param array{cid:string, name:string, type:string, notnull:string, dflt_value:string|null, pk:string} $info
      */
     protected function loadColumnSchema(array $info): ColumnSchema
     {
         $column = $this->createColumnSchema();
         $column->name($info['name']);
         $column->allowNull(!$info['notnull']);
-        $column->primaryKey($info['pk'] != 0);
+        $column->primaryKey($info['pk'] !== '0');
         $column->dbType(strtolower($info['type']));
         $column->unsigned(strpos($column->getDbType(), 'unsigned') !== false);
         $column->type(self::TYPE_STRING);
@@ -434,9 +480,11 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
                 $values = explode(',', $matches[2]);
                 $column->precision((int) $values[0]);
                 $column->size((int) $values[0]);
+
                 if (isset($values[1])) {
                     $column->scale((int) $values[1]);
                 }
+
                 if ($column->getSize() === 1 && ($type === 'tinyint' || $type === 'bit')) {
                     $column->type('boolean');
                 } elseif ($type === 'bit') {
@@ -503,10 +551,8 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     private function loadTableColumnsInfo(string $tableName): array
     {
-        $tableColumns = $this->getDb()->createCommand(
-            'PRAGMA TABLE_INFO (' . $this->quoteValue($tableName) . ')'
-        )->queryAll();
-
+        $tableColumns = $this->getPragmaTableInfo($tableName);
+        /** @psalm-var PragmaTableInfo */
         $tableColumns = $this->normalizePdoRowKeyCase($tableColumns, true);
 
         return ArrayHelper::index($tableColumns, 'cid');
@@ -520,82 +566,50 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      *
      * @throws Exception|InvalidConfigException|Throwable
      *
-     * @return mixed constraints.
+     * @return (Constraint|IndexConstraint)[]|Constraint|null
      */
     private function loadTableConstraints(string $tableName, string $returnType)
     {
-        $tableColumns = null;
-        $indexList = $this->getDb()->createCommand(
-            'PRAGMA INDEX_LIST (' . $this->quoteValue($tableName) . ')'
-        )->queryAll();
+        $indexList = $this->getPragmaIndexList($tableName);
+        /** @psalm-var PragmaIndexList $indexes */
         $indexes = $this->normalizePdoRowKeyCase($indexList, true);
-
-        if (!empty($indexes) && !isset($indexes[0]['origin'])) {
-            /**
-             * SQLite may not have an "origin" column in INDEX_LIST.
-             *
-             * {See https://www.sqlite.org/src/info/2743846cdba572f6}
-             */
-            $tableColumns = $this->loadTableColumnsInfo($tableName);
-        }
-
-        $result = [
-            'primaryKey' => null,
-            'indexes' => [],
-            'uniques' => [],
-        ];
+        $result = ['primaryKey' => null, 'indexes' => [], 'uniques' => []];
 
         foreach ($indexes as $index) {
+            /** @psalm-var Column $columns */
             $columns = $this->getPragmaIndexInfo($index['name']);
 
-            if ($tableColumns !== null) {
-                /** SQLite may not have an "origin" column in INDEX_LIST */
-                $index['origin'] = 'c';
-
-                if (!empty($columns) && $tableColumns[$columns[0]['cid']]['pk'] > 0) {
-                    $index['origin'] = 'pk';
-                }
-            }
-
-            $ic = (new IndexConstraint())
+            $result['indexes'][] = (new IndexConstraint())
                 ->primary($index['origin'] === 'pk')
                 ->unique((bool) $index['unique'])
                 ->name($index['name'])
                 ->columnNames(ArrayHelper::getColumn($columns, 'name'));
 
-            $result['indexes'][] = $ic;
-
-            if ($index['origin'] === 'pk') {
-                $ct = (new Constraint())
-                    ->columnNames(ArrayHelper::getColumn($columns, 'name'));
-
-                $result['primaryKey'] = $ct;
-            } elseif ($index['unique']) {
-                $ct = (new Constraint())
+            if ($index['origin'] === 'u') {
+                $result['uniques'][] = (new Constraint())
                     ->name($index['name'])
                     ->columnNames(ArrayHelper::getColumn($columns, 'name'));
+            }
 
-                $result['uniques'][] = $ct;
+            if ($index['origin'] === 'pk') {
+                $result['primaryKey'] = (new Constraint())
+                    ->columnNames(ArrayHelper::getColumn($columns, 'name'));
             }
         }
 
-        if ($result['primaryKey'] === null) {
+        if (!isset($result['primaryKey'])) {
             /**
              * Additional check for PK in case of INTEGER PRIMARY KEY with ROWID.
              *
              * {@See https://www.sqlite.org/lang_createtable.html#primkeyconst}
+             *
+             * @psalm-var PragmaTableInfo
              */
-
-            if ($tableColumns === null) {
-                $tableColumns = $this->loadTableColumnsInfo($tableName);
-            }
+            $tableColumns = $this->loadTableColumnsInfo($tableName);
 
             foreach ($tableColumns as $tableColumn) {
                 if ($tableColumn['pk'] > 0) {
-                    $ct = (new Constraint())
-                        ->columnNames([$tableColumn['name']]);
-
-                    $result['primaryKey'] = $ct;
+                    $result['primaryKey'] = (new Constraint())->columnNames([$tableColumn['name']]);
                     break;
                 }
             }
@@ -620,15 +634,37 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
         return new ColumnSchema();
     }
 
+    private function getPragmaForeignKeyList(string $tableName): array
+    {
+        return $this->getDb()->createCommand(
+            'PRAGMA FOREIGN_KEY_LIST(' . $this->quoteSimpleTableName(($tableName)) . ')'
+        )->queryAll();
+    }
+
     /**
      * @throws Exception|InvalidConfigException|Throwable
      */
     private function getPragmaIndexInfo(string $name): array
     {
-        $column = $this->getDb()->createCommand('PRAGMA INDEX_INFO (' . $this->quoteValue($name) . ')')->queryAll();
-        $columns = $this->normalizePdoRowKeyCase($column, true);
-        ArraySorter::multisort($columns, 'seqno', SORT_ASC, SORT_NUMERIC);
+        $column = $this->getDb()->createCommand('PRAGMA INDEX_INFO(' . $this->quoteValue($name) . ')')->queryAll();
+        /** @psalm-var Column */
+        $column = $this->normalizePdoRowKeyCase($column, true);
+        ArraySorter::multisort($column, 'seqno', SORT_ASC, SORT_NUMERIC);
 
-        return $columns;
+        return $column;
+    }
+
+    private function getPragmaIndexList(string $tableName): array
+    {
+        return $this->getDb()->createCommand(
+            'PRAGMA INDEX_LIST(' . $this->quoteValue($tableName) . ')'
+        )->queryAll();
+    }
+
+    private function getPragmaTableInfo(string $tableName): array
+    {
+        return $this->getDb()->createCommand(
+            'PRAGMA TABLE_INFO(' . $this->quoteSimpleTableName($tableName) . ')'
+        )->queryAll();
     }
 }

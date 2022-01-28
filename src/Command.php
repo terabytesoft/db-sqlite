@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Yiisoft\Db\Sqlite;
 
-use function array_pop;
-use function count;
-use function ltrim;
-use function preg_match_all;
-use function strpos;
-
 use Throwable;
 use Yiisoft\Db\Command\Command as BaseCommand;
 use Yiisoft\Db\Exception\Exception;
 use Yiisoft\Db\Exception\InvalidArgumentException;
 use Yiisoft\Strings\StringHelper;
+
+use function array_pop;
+use function count;
+use function ltrim;
+use function preg_match_all;
+use function strpos;
 
 final class Command extends BaseCommand
 {
@@ -30,8 +30,9 @@ final class Command extends BaseCommand
      */
     public function execute(): int
     {
-        $sql = $this->getSql();
+        $sql = $this->getSql() ?? '';
 
+        /** @var array<string, string> */
         $params = $this->params;
 
         $statements = $this->splitStatements($sql, $params);
@@ -42,9 +43,11 @@ final class Command extends BaseCommand
 
         $result = 0;
 
+        /** @psalm-var array<array-key, array<array-key, string|array>> $statements */
         foreach ($statements as $statement) {
-            /** @var array $statement */
             [$statementSql, $statementParams] = $statement;
+            $statementSql = is_string($statementSql) ? $statementSql : '';
+            $statementParams = is_array($statementParams) ? $statementParams : [];
             $this->setSql($statementSql)->bindValues($statementParams);
             $result = parent::execute();
         }
@@ -68,24 +71,27 @@ final class Command extends BaseCommand
      */
     protected function queryInternal(string $method, $fetchMode = null)
     {
-        $sql = $this->getSql();
+        $sql = $this->getSql() ?? '';
 
+        /** @var array<string, string> */
         $params = $this->params;
 
         $statements = $this->splitStatements($sql, $params);
 
-        if ($statements === false) {
+        if ($statements === false || $statements === []) {
             return parent::queryInternal($method, $fetchMode);
         }
 
-        /**
-         * @psalm-suppress InvalidArrayOffset
-         *
-         * @var array $statements
-         */
         [$lastStatementSql, $lastStatementParams] = array_pop($statements);
 
+        /**
+         * @psalm-var array<array-key, array> $statements
+         */
         foreach ($statements as $statement) {
+            /**
+             * @var string $statementSql
+             * @var array $statementParams
+             */
             [$statementSql, $statementParams] = $statement;
             $this->setSql($statementSql)->bindValues($statementParams);
             parent::execute();
@@ -93,6 +99,7 @@ final class Command extends BaseCommand
 
         $this->setSql($lastStatementSql)->bindValues($lastStatementParams);
 
+        /** @var string */
         $result = parent::queryInternal($method, $fetchMode);
 
         $this->setSql($sql)->bindValues($params);
@@ -111,6 +118,7 @@ final class Command extends BaseCommand
      *
      * @return array|bool (array|string)[][]|bool
      *
+     * @psalm-param array<string, string> $params
      * @psalm-return false|list<array{0: string, 1: array}>
      */
     private function splitStatements(string $sql, array $params)
@@ -145,8 +153,10 @@ final class Command extends BaseCommand
      * @param array $params
      *
      * @return array
+     *
+     * @psalm-param array<string, string> $params
      */
-    private function extractUsedParams(SqlToken $statement, $params): array
+    private function extractUsedParams(SqlToken $statement, array $params): array
     {
         preg_match_all('/(?P<placeholder>[:][a-zA-Z0-9_]+)/', $statement->getSql(), $matches, PREG_SET_ORDER);
 

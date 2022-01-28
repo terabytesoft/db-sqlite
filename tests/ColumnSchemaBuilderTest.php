@@ -6,7 +6,7 @@ namespace Yiisoft\Db\Sqlite\Tests;
 
 use Yiisoft\Db\Sqlite\ColumnSchemaBuilder;
 use Yiisoft\Db\Sqlite\Schema;
-use Yiisoft\Db\TestUtility\TestColumnSchemaBuilderTrait;
+use Yiisoft\Db\TestSupport\TestColumnSchemaBuilderTrait;
 
 /**
  * @group sqlite

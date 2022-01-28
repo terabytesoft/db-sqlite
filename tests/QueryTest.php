@@ -6,7 +6,9 @@ namespace Yiisoft\Db\Sqlite\Tests;
 
 use Yiisoft\Db\Expression\Expression;
 use Yiisoft\Db\Query\Query;
-use Yiisoft\Db\TestUtility\TestQueryTrait;
+use Yiisoft\Db\TestSupport\TestQueryTrait;
+
+use function version_compare;
 
 /**
  * @group sqlite
@@ -45,9 +47,15 @@ final class QueryTest extends TestCase
 
         $result = $query->column();
 
-        $this->assertCount(2, $result);
-        $this->assertContains('2', $result);
-        $this->assertContains('3', $result);
-        $this->assertNotContains('1', $result);
+        // check
+        if (version_compare(PHP_VERSION, '8.1', '>=')) {
+            $this->assertContains(2, $result);
+            $this->assertContains(3, $result);
+            $this->assertNotContains(1, $result);
+        } else {
+            $this->assertContains('2', $result);
+            $this->assertContains('3', $result);
+            $this->assertNotContains('1', $result);
+        }
     }
 }

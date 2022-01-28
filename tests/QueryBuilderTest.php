@@ -8,8 +8,8 @@ use Closure;
 use Yiisoft\Arrays\ArrayHelper;
 use Yiisoft\Db\Query\Query;
 use Yiisoft\Db\Sqlite\QueryBuilder;
-use Yiisoft\Db\TestUtility\TestQueryBuilderTrait;
-use Yiisoft\Db\TestUtility\TraversableObject;
+use Yiisoft\Db\TestSupport\TestQueryBuilderTrait;
+use Yiisoft\Db\TestSupport\TraversableObject;
 
 /**
  * @group sqlite
@@ -118,82 +118,9 @@ final class QueryBuilderTest extends TestCase
         $this->assertEquals($expected, $sql);
     }
 
-    public function addDropForeignKeysProvider(): array
+    public function testAddDropForeignKey(): void
     {
-        $tableName = 'T_constraints_3';
-        $name = 'CN_constraints_3';
-        $pkTableName = 'T_constraints_2';
-
-        return [
-            'drop' => [
-                'PRAGMA foreign_keys = 0;SAVEPOINT drop_column_T_constraints_3;CREATE TABLE `temp_T_constraints_3` AS SELECT * FROM `T_constraints_3`;DROP TABLE `T_constraints_3`;CREATE TABLE `T_constraints_3` ("C_id" INT NOT NULL,' . " \n"
-                . '"C_fk_id_1" INT NOT NULL,' . " \n"
-                . '"C_fk_id_2" INT NOT NULL);INSERT INTO `T_constraints_3` SELECT "C_id","C_fk_id_1","C_fk_id_2" FROM `temp_T_constraints_3`;DROP TABLE `temp_T_constraints_3`;RELEASE drop_column_T_constraints_3;PRAGMA foreign_keys = 0',
-                static function (QueryBuilder $qb) use ($tableName, $name) {
-                    return $qb->dropForeignKey($name, $tableName);
-                },
-            ],
-            'add' => [
-                'PRAGMA foreign_keys = off;SAVEPOINT add_foreign_key_to_temp_T_constraints_3;CREATE TEMP TABLE'
-                . ' `temp_T_constraints_3` AS SELECT * FROM `T_constraints_3`;DROP TABLE `T_constraints_3`;'
-                . 'CREATE TABLE `T_constraints_3` ("C_id" INT NOT NULL,' . "\n"
-                . '    "C_fk_id_1" INT NOT NULL,' . "\n"
-                . '    "C_fk_id_2" INT NOT NULL,' . "\n"
-                . '    CONSTRAINT "CN_constraints_3" FOREIGN KEY ("C_fk_id_1", "C_fk_id_2") REFERENCES'
-                . ' "T_constraints_2" ("C_id_1", "C_id_2") ON DELETE CASCADE ON UPDATE CASCADE,' . "\n"
-                . 'CONSTRAINT `CN_constraints_3` FOREIGN KEY (C_fk_id_1) REFERENCES T_constraints_2(C_id_1)'
-                . ' ON UPDATE CASCADE ON DELETE CASCADE);INSERT INTO `T_constraints_3`'
-                . ' SELECT * FROM `temp_T_constraints_3`;DROP TABLE `temp_T_constraints_3`;'
-                . 'RELEASE add_foreign_key_to_temp_T_constraints_3;PRAGMA foreign_keys = 0',
-                static function (QueryBuilder $qb) use ($tableName, $name, $pkTableName) {
-                    return $qb->addForeignKey(
-                        $name,
-                        $tableName,
-                        'C_fk_id_1',
-                        $pkTableName,
-                        'C_id_1',
-                        'CASCADE',
-                        'CASCADE'
-                    );
-                },
-            ],
-            'add (2 columns)' => [
-                'PRAGMA foreign_keys = off;SAVEPOINT add_foreign_key_to_temp_T_constraints_3;'
-                . 'CREATE TEMP TABLE `temp_T_constraints_3` AS SELECT * FROM `T_constraints_3`;'
-                . 'DROP TABLE `T_constraints_3`;CREATE TABLE `T_constraints_3` ("C_id" INT NOT NULL,' . "\n"
-                . '    "C_fk_id_1" INT NOT NULL,' . "\n"
-                . '    "C_fk_id_2" INT NOT NULL,' . "\n"
-                . '    CONSTRAINT "CN_constraints_3" FOREIGN KEY ("C_fk_id_1", "C_fk_id_2")'
-                . ' REFERENCES "T_constraints_2" ("C_id_1", "C_id_2") ON DELETE CASCADE ON UPDATE CASCADE,' . "\n"
-                . 'CONSTRAINT `CN_constraints_3` FOREIGN KEY (C_fk_id_1, C_fk_id_2)'
-                . ' REFERENCES T_constraints_2(C_id_1, C_id_2) ON UPDATE CASCADE ON DELETE CASCADE);'
-                . 'INSERT INTO `T_constraints_3` SELECT * FROM `temp_T_constraints_3`;'
-                . 'DROP TABLE `temp_T_constraints_3`;RELEASE add_foreign_key_to_temp_T_constraints_3;'
-                . 'PRAGMA foreign_keys = 0',
-                static function (QueryBuilder $qb) use ($tableName, $name, $pkTableName) {
-                    return $qb->addForeignKey(
-                        $name,
-                        $tableName,
-                        'C_fk_id_1, C_fk_id_2',
-                        $pkTableName,
-                        'C_id_1, C_id_2',
-                        'CASCADE',
-                        'CASCADE'
-                    );
-                },
-            ],
-        ];
-    }
-
-    /**
-     * @dataProvider addDropForeignKeysProvider
-     *
-     * @param string $sql
-     * @param Closure $builder
-     */
-    public function testAddDropForeignKey(string $sql, Closure $builder): void
-    {
-        $this->assertEqualsWithoutLE($this->getConnection()->quoteSql($sql), $builder($this->getQueryBuilder()));
+        $this->markTestSkipped('Adding/dropping foreign keys is not supported in SQLite.');
     }
 
     public function batchInsertProvider(): array
