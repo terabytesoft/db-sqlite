@@ -211,9 +211,7 @@ final class SchemaTest extends TestCase
         $db = $this->getConnection();
 
         $schema = $db->getSchema();
-
         $table = $schema->getTableSchema('composite_fk');
-
         $fk = $table->getForeignKeys();
         $this->assertCount(1, $fk);
         $this->assertTrue(isset($fk[0]));
@@ -264,7 +262,6 @@ final class SchemaTest extends TestCase
         $tableMaster = 'departments';
         $tableRelation = 'students';
         $tableRelation1 = 'benefits';
-
         $schema = $db->getSchema();
 
         if ($schema->getTableSchema($tableRelation1) !== null) {
@@ -336,17 +333,16 @@ final class SchemaTest extends TestCase
      */
     public function testGetTableNames(array $pdoAttributes): void
     {
-        $connection = $this->getConnection(true);
+        $db = $this->getConnection(true);
 
         foreach ($pdoAttributes as $name => $value) {
-            $connection->getPDO()->setAttribute($name, $value);
+            $db->getPDO()->setAttribute($name, $value);
         }
 
-        $schema = $connection->getSchema();
-
+        $schema = $db->getSchema();
         $tables = $schema->getTableNames();
 
-        if ($connection->getDriverName() === 'sqlsrv') {
+        if ($db->getDriverName() === 'sqlsrv') {
             $tables = array_map(static function ($item) {
                 return trim($item, '[]');
             }, $tables);
@@ -376,9 +372,7 @@ final class SchemaTest extends TestCase
         }
 
         $schema = $db->getSchema();
-
         $tables = $schema->getTableSchemas();
-
         $this->assertCount(count($schema->getTableNames()), $tables);
 
         foreach ($tables as $table) {
@@ -452,7 +446,6 @@ final class SchemaTest extends TestCase
         }
 
         $constraints = $this->getConnection()->getSchema()->{'getTable' . ucfirst($type)}($tableName);
-
         $this->assertMetadataEquals($expected, $constraints);
     }
 
@@ -472,12 +465,9 @@ final class SchemaTest extends TestCase
             $this->expectException(NotSupportedException::class);
         }
 
-        $connection = $this->getConnection();
-
-        $connection->getSlavePdo()->setAttribute(PDO::ATTR_CASE, PDO::CASE_LOWER);
-
-        $constraints = $connection->getSchema()->{'getTable' . ucfirst($type)}($tableName, true);
-
+        $db = $this->getConnection();
+        $db->getSlavePdo()->setAttribute(PDO::ATTR_CASE, PDO::CASE_LOWER);
+        $constraints = $db->getSchema()->{'getTable' . ucfirst($type)}($tableName, true);
         $this->assertMetadataEquals($expected, $constraints);
     }
 
@@ -497,12 +487,9 @@ final class SchemaTest extends TestCase
             $this->expectException(NotSupportedException::class);
         }
 
-        $connection = $this->getConnection();
-
-        $connection->getSlavePdo()->setAttribute(PDO::ATTR_CASE, PDO::CASE_UPPER);
-
-        $constraints = $connection->getSchema()->{'getTable' . ucfirst($type)}($tableName, true);
-
+        $db = $this->getConnection();
+        $db->getSlavePdo()->setAttribute(PDO::ATTR_CASE, PDO::CASE_UPPER);
+        $constraints = $db->getSchema()->{'getTable' . ucfirst($type)}($tableName, true);
         $this->assertMetadataEquals($expected, $constraints);
     }
 

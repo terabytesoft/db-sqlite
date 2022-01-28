@@ -77,6 +77,7 @@ final class ConnectionTest extends TestCase
     public function testGetPdoAfterClose(): void
     {
         $db = $this->getConnection();
+
         $db->setSlave(
             '1',
             $this->getConnection(false, 'sqlite:' . __DIR__ . '/Runtime/yii_test_slave.sq3'),
@@ -84,7 +85,6 @@ final class ConnectionTest extends TestCase
         $this->assertNotNull($db->getSlavePdo(false));
 
         $db->close();
-
 
         $masterPdo = $db->getMasterPdo();
         $this->assertNotFalse($masterPdo);
@@ -200,7 +200,6 @@ final class ConnectionTest extends TestCase
         $this->assertInstanceOf(PDO::class, $db->getPDO());
 
         $db->close();
-
         $this->assertFalse($db->isActive());
         $this->assertNull($db->getPDO());
 

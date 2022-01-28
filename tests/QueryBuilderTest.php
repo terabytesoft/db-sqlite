@@ -6,6 +6,7 @@ namespace Yiisoft\Db\Sqlite\Tests;
 
 use Closure;
 use Yiisoft\Arrays\ArrayHelper;
+use Yiisoft\Db\Connection\ConnectionInterface;
 use Yiisoft\Db\Query\Query;
 use Yiisoft\Db\Sqlite\QueryBuilder;
 use Yiisoft\Db\TestSupport\TestQueryBuilderTrait;
@@ -23,9 +24,9 @@ final class QueryBuilderTest extends TestCase
     /**
      * @return QueryBuilder
      */
-    protected function getQueryBuilder(): QueryBuilder
+    protected function getQueryBuilder(ConnectionInterface $db): QueryBuilder
     {
-        return new QueryBuilder($this->getConnection());
+        return new QueryBuilder($this->getConnection($db));
     }
 
     public function testBuildUnion(): void
@@ -41,23 +42,18 @@ final class QueryBuilderTest extends TestCase
         $query = new Query($db);
 
         $secondQuery = new Query($db);
-
-        $secondQuery->select('id')
-            ->from('TotalTotalExample t2')
-            ->where('w > 5');
+        $secondQuery->select('id')->from('TotalTotalExample t2')->where('w > 5');
 
         $thirdQuery = new Query($db);
+        $thirdQuery->select('id')->from('TotalTotalExample t3')->where('w = 3');
 
-        $thirdQuery->select('id')
-            ->from('TotalTotalExample t3')
-            ->where('w = 3');
         $query->select('id')
             ->from('TotalExample t1')
             ->where(['and', 'w > 0', 'x < 2'])
             ->union($secondQuery)
             ->union($thirdQuery, true);
-        [$actualQuerySql, $queryParams] = $this->getQueryBuilder()->build($query);
 
+        [$actualQuerySql, $queryParams] = $this->getQueryBuilder($db)->build($query);
         $this->assertEquals($expectedQuerySql, $actualQuerySql);
         $this->assertEquals([], $queryParams);
     }
@@ -72,42 +68,31 @@ final class QueryBuilderTest extends TestCase
             . ' SELECT * FROM [[a2]]'
         );
 
-        $with1Query = (new Query($db))
-            ->select('id')
-            ->from('t1')
-            ->where('expr = 1');
-
-        $with2Query = (new Query($db))
-            ->select('id')
-            ->from('t2')
-            ->innerJoin('a1', 't2.id = a1.id')
-            ->where('expr = 2');
-
-        $with3Query = (new Query($db))
-            ->select('id')
-            ->from('t3')
-            ->where('expr = 3');
+        $with1Query = (new Query($db))->select('id')->from('t1')->where('expr = 1');
+        $with2Query = (new Query($db))->select('id')->from('t2')->innerJoin('a1', 't2.id = a1.id')->where('expr = 2');
+        $with3Query = (new Query($db))->select('id')->from('t3')->where('expr = 3');
 
         $query = (new Query($db))
             ->withQuery($with1Query, 'a1')
             ->withQuery($with2Query->union($with3Query), 'a2')
             ->from('a2');
 
-        [$actualQuerySql, $queryParams] = $this->getQueryBuilder()->build($query);
-
+        [$actualQuerySql, $queryParams] = $this->getQueryBuilder($db)->build($query);
         $this->assertEquals($expectedQuerySql, $actualQuerySql);
         $this->assertEquals([], $queryParams);
     }
 
     public function testRenameTable()
     {
-        $sql = $this->getQueryBuilder()->renameTable('table_from', 'table_to');
+        $db = $this->getConnection();
+        $sql = $this->getQueryBuilder($db)->renameTable('table_from', 'table_to');
         $this->assertEquals('ALTER TABLE `table_from` RENAME TO `table_to`', $sql);
     }
 
     public function testResetSequence(): void
     {
-        $qb = $this->getQueryBuilder(true, true);
+        $db = $this->getConnection(true);
+        $qb = $this->getQueryBuilder($db);
 
         $expected = "UPDATE sqlite_sequence SET seq='5' WHERE name='item'";
         $sql = $qb->resetSequence('item');
@@ -126,10 +111,8 @@ final class QueryBuilderTest extends TestCase
     public function batchInsertProvider(): array
     {
         $data = $this->batchInsertProviderTrait();
-
         $data['escape-danger-chars']['expected'] = 'INSERT INTO `customer` (`address`)'
             . " VALUES ('SQL-danger chars are escaped: ''); --')";
-
         return $data;
     }
 
@@ -148,10 +131,9 @@ final class QueryBuilderTest extends TestCase
      */
     public function testBatchInsert(string $table, array $columns, array $value, string $expected): void
     {
-        $queryBuilder = $this->getQueryBuilder();
-
+        $db = $this->getConnection();
+        $queryBuilder = $this->getQueryBuilder($db);
         $sql = $queryBuilder->batchInsert($table, $columns, $value);
-
         $this->assertEquals($expected, $sql);
     }
 
@@ -189,11 +171,8 @@ final class QueryBuilderTest extends TestCase
     public function testBuildCondition($condition, string $expected, array $expectedParams): void
     {
         $db = $this->getConnection();
-
         $query = (new Query($db))->where($condition);
-
-        [$sql, $params] = $this->getQueryBuilder()->build($query);
-
+        [$sql, $params] = $this->getQueryBuilder($db)->build($query);
         $this->assertEquals('SELECT *' . (empty($expected) ? '' : ' WHERE ' . $this->replaceQuotes($expected)), $sql);
         $this->assertEquals($expectedParams, $params);
     }
@@ -212,10 +191,9 @@ final class QueryBuilderTest extends TestCase
      */
     public function testBuildFilterCondition(array $condition, string $expected, array $expectedParams): void
     {
-        $query = (new Query($this->getConnection()))->filterWhere($condition);
-
-        [$sql, $params] = $this->getQueryBuilder()->build($query);
-
+        $db = $this->getConnection();
+        $query = (new Query($db))->filterWhere($condition);
+        [$sql, $params] = $this->getQueryBuilder($db)->build($query);
         $this->assertEquals('SELECT *' . (empty($expected) ? '' : ' WHERE ' . $this->replaceQuotes($expected)), $sql);
         $this->assertEquals($expectedParams, $params);
     }
@@ -224,18 +202,15 @@ final class QueryBuilderTest extends TestCase
     {
         $result = parent::indexesProvider();
         $result['drop'][0] = 'DROP INDEX [[CN_constraints_2_single]]';
-
         $indexName = 'myindex';
         $schemaName = 'myschema';
         $tableName = 'mytable';
-
         $result['with schema'] = [
             "CREATE INDEX {{{$schemaName}}}.[[$indexName]] ON {{{$tableName}}} ([[C_index_1]])",
             function (QueryBuilder $qb) use ($tableName, $indexName, $schemaName) {
                 return $qb->createIndex($indexName, $schemaName . '.' . $tableName, 'C_index_1');
             },
         ];
-
         return $result;
     }
 
@@ -249,10 +224,9 @@ final class QueryBuilderTest extends TestCase
      */
     public function testBuildFrom(string $table, string $expected): void
     {
+        $db = $this->getConnection();
         $params = [];
-
-        $sql = $this->getQueryBuilder()->buildFrom([$table], $params);
-
+        $sql = $this->getQueryBuilder($db)->buildFrom([$table], $params);
         $this->assertEquals('FROM ' . $this->replaceQuotes($expected), $sql);
     }
 
@@ -271,11 +245,8 @@ final class QueryBuilderTest extends TestCase
     public function testBuildLikeCondition($condition, string $expected, array $expectedParams): void
     {
         $db = $this->getConnection();
-
         $query = (new Query($db))->where($condition);
-
-        [$sql, $params] = $this->getQueryBuilder()->build($query);
-
+        [$sql, $params] = $this->getQueryBuilder($db)->build($query);
         $this->assertEquals('SELECT *' . (empty($expected) ? '' : ' WHERE ' . $this->replaceQuotes($expected)), $sql);
         $this->assertEquals($expectedParams, $params);
     }
@@ -294,22 +265,12 @@ final class QueryBuilderTest extends TestCase
     public function testBuildWhereExists(string $cond, string $expectedQuerySql): void
     {
         $db = $this->getConnection();
-
         $expectedQueryParams = [];
-
         $subQuery = new Query($db);
-
-        $subQuery->select('1')
-            ->from('Website w');
-
+        $subQuery->select('1')->from('Website w');
         $query = new Query($db);
-
-        $query->select('id')
-            ->from('TotalExample t')
-            ->where([$cond, $subQuery]);
-
-        [$actualQuerySql, $actualQueryParams] = $this->getQueryBuilder()->build($query);
-
+        $query->select('id')->from('TotalExample t')->where([$cond, $subQuery]);
+        [$actualQuerySql, $actualQueryParams] = $this->getQueryBuilder($db)->build($query);
         $this->assertEquals($expectedQuerySql, $actualQuerySql);
         $this->assertEquals($expectedQueryParams, $actualQueryParams);
     }
@@ -317,20 +278,16 @@ final class QueryBuilderTest extends TestCase
     public function createDropIndexesProvider(): array
     {
         $result = $this->createDropIndexesProviderTrait();
-
         $result['drop'][0] = 'DROP INDEX [[CN_constraints_2_single]]';
-
         $indexName = 'myindex';
         $schemaName = 'myschema';
         $tableName = 'mytable';
-
         $result['with schema'] = [
             "CREATE INDEX {{{$schemaName}}}.[[$indexName]] ON {{{$tableName}}} ([[C_index_1]])",
             function (QueryBuilder $qb) use ($tableName, $indexName, $schemaName) {
                 return $qb->createIndex($indexName, $schemaName . '.' . $tableName, 'C_index_1');
             },
         ];
-
         return $result;
     }
 
@@ -341,7 +298,8 @@ final class QueryBuilderTest extends TestCase
      */
     public function testCreateDropIndex(string $sql, Closure $builder): void
     {
-        $this->assertSame($this->getConnection()->quoteSql($sql), $builder($this->getQueryBuilder()));
+        $db = $this->getConnection();
+        $this->assertSame($db->quoteSql($sql), $builder($this->getQueryBuilder($db)));
     }
 
     /**
@@ -359,10 +317,9 @@ final class QueryBuilderTest extends TestCase
      */
     public function testDelete(string $table, $condition, string $expectedSQL, array $expectedParams): void
     {
+        $db = $this->getConnection();
         $actualParams = [];
-
-        $actualSQL = $this->getQueryBuilder()->delete($table, $condition, $actualParams);
-
+        $actualSQL = $this->getQueryBuilder($db)->delete($table, $condition, $actualParams);
         $this->assertSame($expectedSQL, $actualSQL);
         $this->assertSame($expectedParams, $actualParams);
     }
@@ -383,10 +340,9 @@ final class QueryBuilderTest extends TestCase
      */
     public function testInsert(string $table, $columns, array $params, string $expectedSQL, array $expectedParams): void
     {
+        $db = $this->getConnection();
         $actualParams = $params;
-
-        $actualSQL = $this->getQueryBuilder()->insert($table, $columns, $actualParams);
-
+        $actualSQL = $this->getQueryBuilder($db)->insert($table, $columns, $actualParams);
         $this->assertSame($expectedSQL, $actualSQL);
         $this->assertSame($expectedParams, $actualParams);
     }
@@ -412,10 +368,9 @@ final class QueryBuilderTest extends TestCase
         string $expectedSQL,
         array $expectedParams
     ): void {
+        $db = $this->getConnection();
         $actualParams = [];
-
-        $actualSQL = $this->getQueryBuilder()->update($table, $columns, $condition, $actualParams);
-
+        $actualSQL = $this->getQueryBuilder($db)->update($table, $columns, $condition, $actualParams);
         $this->assertSame($expectedSQL, $actualSQL);
         $this->assertSame($expectedParams, $actualParams);
     }
@@ -486,10 +441,9 @@ final class QueryBuilderTest extends TestCase
      */
     public function testUpsert(string $table, $insertColumns, $updateColumns, $expectedSQL, array $expectedParams): void
     {
+        $db = $this->getConnection();
         $actualParams = [];
-
-        $actualSQL = $this->getQueryBuilder()
-            ->upsert($table, $insertColumns, $updateColumns, $actualParams);
+        $actualSQL = $this->getQueryBuilder($db)->upsert($table, $insertColumns, $updateColumns, $actualParams);
 
         if (is_string($expectedSQL)) {
             $this->assertSame($expectedSQL, $actualSQL);
