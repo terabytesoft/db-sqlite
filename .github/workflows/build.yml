@@ -63,7 +63,6 @@ jobs:
 
       - name: Run tests with phpunit with code coverage
         run: vendor/bin/phpunit --coverage-clover=coverage.clover --colors=always
-        continue-on-error: true
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest'
