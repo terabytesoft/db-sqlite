@@ -7,6 +7,8 @@ namespace Yiisoft\Db\Sqlite;
 use Throwable;
 use Yiisoft\Arrays\ArrayHelper;
 use Yiisoft\Arrays\ArraySorter;
+use Yiisoft\Db\Cache\SchemaCache;
+use Yiisoft\Db\Connection\ConnectionPDOInterface;
 use Yiisoft\Db\Constraint\CheckConstraint;
 use Yiisoft\Db\Constraint\Constraint;
 use Yiisoft\Db\Constraint\ConstraintFinderInterface;
@@ -133,6 +135,11 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     protected $columnQuoteCharacter = '`';
 
+    public function __construct(private ConnectionPDOInterface $db, SchemaCache $schemaCache)
+    {
+        parent::__construct($db, $schemaCache);
+    }
+
     /**
      * Returns all table names in the database.
      *
@@ -147,7 +154,7 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     protected function findTableNames(string $schema = ''): array
     {
-        return $this->getDb()->createCommand(
+        return $this->db->createCommand(
             "SELECT DISTINCT tbl_name FROM sqlite_master WHERE tbl_name<>'sqlite_sequence' ORDER BY tbl_name"
         )->queryColumn();
     }
@@ -271,7 +278,7 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     protected function loadTableChecks(string $tableName): array
     {
-        $sql = $this->getDb()->createCommand(
+        $sql = $this->db->createCommand(
             'SELECT `sql` FROM `sqlite_master` WHERE name = :tableName',
             [':tableName' => $tableName],
         )->queryScalar();
@@ -334,7 +341,7 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     public function createQueryBuilder(): QueryBuilder
     {
-        return new QueryBuilder($this->getDb());
+        return new QueryBuilder($this->db);
     }
 
     /**
@@ -528,10 +535,10 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
     {
         switch ($level) {
             case Transaction::SERIALIZABLE:
-                $this->getDb()->createCommand('PRAGMA read_uncommitted = False;')->execute();
+                $this->db->createCommand('PRAGMA read_uncommitted = False;')->execute();
                 break;
             case Transaction::READ_UNCOMMITTED:
-                $this->getDb()->createCommand('PRAGMA read_uncommitted = True;')->execute();
+                $this->db->createCommand('PRAGMA read_uncommitted = True;')->execute();
                 break;
             default:
                 throw new NotSupportedException(
@@ -636,7 +643,7 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
 
     private function getPragmaForeignKeyList(string $tableName): array
     {
-        return $this->getDb()->createCommand(
+        return $this->db->createCommand(
             'PRAGMA FOREIGN_KEY_LIST(' . $this->quoteSimpleTableName(($tableName)) . ')'
         )->queryAll();
     }
@@ -646,7 +653,7 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     private function getPragmaIndexInfo(string $name): array
     {
-        $column = $this->getDb()->createCommand('PRAGMA INDEX_INFO(' . $this->quoteValue($name) . ')')->queryAll();
+        $column = $this->db->createCommand('PRAGMA INDEX_INFO(' . $this->quoteValue($name) . ')')->queryAll();
         /** @psalm-var Column */
         $column = $this->normalizePdoRowKeyCase($column, true);
         ArraySorter::multisort($column, 'seqno', SORT_ASC, SORT_NUMERIC);
@@ -656,14 +663,14 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
 
     private function getPragmaIndexList(string $tableName): array
     {
-        return $this->getDb()->createCommand(
+        return $this->db->createCommand(
             'PRAGMA INDEX_LIST(' . $this->quoteValue($tableName) . ')'
         )->queryAll();
     }
 
     private function getPragmaTableInfo(string $tableName): array
     {
-        return $this->getDb()->createCommand(
+        return $this->db->createCommand(
             'PRAGMA TABLE_INFO(' . $this->quoteSimpleTableName($tableName) . ')'
         )->queryAll();
     }

@@ -212,7 +212,6 @@ final class ConnectionPDOSqlite extends Connection implements ConnectionPDOInter
     private function initConnection(): void
     {
         $this->pdo = $this->driver->createConnection();
-
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         if ($this->getEmulatePrepare() !== null && constant('PDO::ATTR_EMULATE_PREPARES')) {

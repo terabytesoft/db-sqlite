@@ -54,6 +54,7 @@ class TestCase extends AbstractTestCase
     protected function tearDown(): void
     {
         parent::tearDown();
+        $this->db?->close();
         unset(
             $this->cache,
             $this->db,
