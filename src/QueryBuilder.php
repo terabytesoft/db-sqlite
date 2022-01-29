@@ -202,7 +202,7 @@ final class QueryBuilder extends BaseQueryBuilder
                 $pk = $table->getPrimaryKey();
                 $key = $this->db->quoteColumnName(reset($pk));
                 $value = $this->db->useMaster(static function (ConnectionInterface $db) use ($key, $tableName) {
-                    return $this->db->createCommand("SELECT MAX($key) FROM $tableName")->queryScalar();
+                    return $db->createCommand("SELECT MAX($key) FROM $tableName")->queryScalar();
                 });
             } else {
                 $value = (int) $value - 1;
