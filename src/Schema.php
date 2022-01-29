@@ -373,6 +373,10 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
         /** @psalm-var PragmaTableInfo */
         $columns = $this->getPragmaTableInfo($table->getName());
 
+        if (empty($columns)) {
+            return false;
+        }
+
         foreach ($columns as $info) {
             $column = $this->loadColumnSchema($info);
             $table->columns($column->getName(), $column);
@@ -389,7 +393,7 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
             $column->autoIncrement(true);
         }
 
-        return empty($columns) ? false : true;
+        return true;
     }
 
     /**
