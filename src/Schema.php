@@ -389,7 +389,7 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
             $column->autoIncrement(true);
         }
 
-        return !empty($columns);
+        return empty($columns) ? false : true;
     }
 
     /**
