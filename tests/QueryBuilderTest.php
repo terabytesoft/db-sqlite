@@ -375,6 +375,36 @@ final class QueryBuilderTest extends TestCase
         $this->assertSame($expectedParams, $actualParams);
     }
 
+    public function testCreateTableColumnTypes(): void
+    {
+        $db = $this->getConnection(true);
+        $qb = $this->getQueryBuilder($db);
+
+        if ($db->getTableSchema('column_type_table', true) !== null) {
+            $db->createCommand($qb->dropTable('column_type_table'))->execute();
+        }
+
+        $columns = [];
+        $i = 0;
+
+        foreach ($this->columnTypes() as [$column, $builder, $expected]) {
+            if (
+                !(
+                    strncmp($column, Schema::TYPE_PK, 2) === 0 ||
+                    strncmp($column, Schema::TYPE_UPK, 3) === 0 ||
+                    strncmp($column, Schema::TYPE_BIGPK, 5) === 0 ||
+                    strncmp($column, Schema::TYPE_UBIGPK, 6) === 0 ||
+                    strncmp(substr($column, -5), 'FIRST', 5) === 0
+                )
+            ) {
+                $columns['col' . ++$i] = str_replace('CHECK (value', 'CHECK ([[col' . $i . ']]', $column);
+            }
+        }
+
+        $db->createCommand($qb->createTable('column_type_table', $columns))->execute();
+        $this->assertNotEmpty($db->getTableSchema('column_type_table', true));
+    }
+
     public function upsertProvider(): array
     {
         $concreteData = [
