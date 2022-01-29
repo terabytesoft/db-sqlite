@@ -9,6 +9,7 @@ use Yiisoft\Arrays\ArrayHelper;
 use Yiisoft\Db\Connection\ConnectionInterface;
 use Yiisoft\Db\Query\Query;
 use Yiisoft\Db\Sqlite\QueryBuilder;
+use Yiisoft\Db\Sqlite\Schema;
 use Yiisoft\Db\TestSupport\TestQueryBuilderTrait;
 use Yiisoft\Db\TestSupport\TraversableObject;
 
