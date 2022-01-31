@@ -14,6 +14,7 @@ use Yiisoft\Db\Connection\ConnectionPDOInterface;
 use Yiisoft\Db\Driver\PDODriver;
 use Yiisoft\Db\Exception\Exception;
 use Yiisoft\Db\Exception\InvalidConfigException;
+use Yiisoft\Db\Schema\Quoter;
 
 use function constant;
 use function strncmp;
@@ -25,6 +26,9 @@ use function substr;
 final class ConnectionPDOSqlite extends Connection implements ConnectionPDOInterface
 {
     private ?PDO $pdo = null;
+    private ?QueryBuilder $queryBuilder = null;
+    private ?Quoter $quoter = null;
+    private ?Schema $schema = null;
 
     public function __construct(
         private PDODriver $driver,
@@ -72,7 +76,7 @@ final class ConnectionPDOSqlite extends Connection implements ConnectionPDOInter
     public function createCommand(?string $sql = null, array $params = []): Command
     {
         if ($sql !== null) {
-            $sql = $this->quoteSql($sql);
+            $sql = $this->getQuoter()->quoteSql($sql);
         }
 
         $command = new Command($this, $this->queryCache, $sql);
@@ -91,7 +95,7 @@ final class ConnectionPDOSqlite extends Connection implements ConnectionPDOInter
     public function close(): void
     {
         if (!empty($this->master)) {
-            /** @var ConnectionPDOSqlite */
+            /** @var ConnectionPDOPgsql */
             $db = $this->master;
 
             if ($this->pdo === $db->getPDO()) {
@@ -139,14 +143,36 @@ final class ConnectionPDOSqlite extends Connection implements ConnectionPDOInter
         return $this->pdo;
     }
 
+    public function getQueryBuilder(): QueryBuilder
+    {
+        if ($this->queryBuilder === null) {
+            $this->queryBuilder = new QueryBuilder($this);
+        }
+
+        return $this->queryBuilder;
+    }
+
+    public function getQuoter(): Quoter
+    {
+        if ($this->quoter === null) {
+            $this->quoter = new Quoter('`', '`', $this->driver, $this->getTablePrefix());
+        }
+
+        return $this->quoter;
+    }
+
     public function getSchema(): Schema
     {
-        return new Schema($this, $this->schemaCache);
+        if ($this->schema === null) {
+            $this->schema = new Schema($this, $this->schemaCache);
+        }
+
+        return $this->schema;
     }
 
     public function getSlavePdo(bool $fallbackToMaster = true): ?PDO
     {
-        /** @var ConnectionPDOSqlite|null $db */
+        /** @var ConnectionPDOPgssql|null $db */
         $db = $this->getSlave(false);
 
         if ($db === null) {
@@ -168,7 +194,7 @@ final class ConnectionPDOSqlite extends Connection implements ConnectionPDOInter
         }
 
         if (!empty($this->masters)) {
-            /** @var ConnectionPDOSqlite|null */
+            /** @var ConnectionPDOPgsql|null */
             $db = $this->getMaster();
 
             if ($db !== null) {

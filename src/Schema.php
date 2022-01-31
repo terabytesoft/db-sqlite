@@ -644,7 +644,7 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
     private function getPragmaForeignKeyList(string $tableName): array
     {
         return $this->db->createCommand(
-            'PRAGMA FOREIGN_KEY_LIST(' . $this->quoteSimpleTableName(($tableName)) . ')'
+            'PRAGMA FOREIGN_KEY_LIST(' . $this->db->getQuoter()->quoteSimpleTableName(($tableName)) . ')'
         )->queryAll();
     }
 
@@ -653,7 +653,8 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     private function getPragmaIndexInfo(string $name): array
     {
-        $column = $this->db->createCommand('PRAGMA INDEX_INFO(' . $this->quoteValue($name) . ')')->queryAll();
+        $column = $this->db
+            ->createCommand('PRAGMA INDEX_INFO(' . $this->db->getQuoter()->quoteValue($name) . ')')->queryAll();
         /** @psalm-var Column */
         $column = $this->normalizePdoRowKeyCase($column, true);
         ArraySorter::multisort($column, 'seqno', SORT_ASC, SORT_NUMERIC);
@@ -663,13 +664,14 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
 
     private function getPragmaIndexList(string $tableName): array
     {
-        return $this->db->createCommand('PRAGMA INDEX_LIST(' . $this->quoteValue($tableName) . ')')->queryAll();
+        return $this->db
+            ->createCommand('PRAGMA INDEX_LIST(' . $this->db->getQuoter()->quoteValue($tableName) . ')')->queryAll();
     }
 
     private function getPragmaTableInfo(string $tableName): array
     {
         return $this->db->createCommand(
-            'PRAGMA TABLE_INFO(' . $this->quoteSimpleTableName($tableName) . ')'
+            'PRAGMA TABLE_INFO(' . $this->db->getQuoter()->quoteSimpleTableName($tableName) . ')'
         )->queryAll();
     }
 }

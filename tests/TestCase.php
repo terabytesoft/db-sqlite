@@ -21,7 +21,7 @@ class TestCase extends AbstractTestCase
     protected array $dataProvider;
     protected string $likeEscapeCharSql = '';
     protected array $likeParameterReplacements = [];
-    private ConnectionPDOSqlite $db;
+    protected ConnectionPDOSqlite $db;
 
     /**
      * @param bool $reset whether to clean up the test database.

@@ -213,9 +213,11 @@ final class ConnectionTest extends TestCase
     public function testQuoteValue(): void
     {
         $db = $this->getConnection();
-        $this->assertEquals(123, $db->quoteValue(123));
-        $this->assertEquals("'string'", $db->quoteValue('string'));
-        $this->assertEquals("'It''s interesting'", $db->quoteValue("It's interesting"));
+        $quoter = $db->getQuoter();
+
+        $this->assertEquals(123, $quoter->quoteValue(123));
+        $this->assertEquals("'string'", $quoter->quoteValue('string'));
+        $this->assertEquals("'It''s interesting'", $quoter->quoteValue("It's interesting"));
     }
 
     public function testRestoreMasterAfterException(): void

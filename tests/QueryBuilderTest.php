@@ -300,7 +300,7 @@ final class QueryBuilderTest extends TestCase
     public function testCreateDropIndex(string $sql, Closure $builder): void
     {
         $db = $this->getConnection();
-        $this->assertSame($db->quoteSql($sql), $builder($this->getQueryBuilder($db)));
+        $this->assertSame($db->getQuoter()->quoteSql($sql), $builder($this->getQueryBuilder($db)));
     }
 
     /**

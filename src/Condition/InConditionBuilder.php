@@ -12,7 +12,6 @@ use Yiisoft\Db\Exception\NotSupportedException;
 use Yiisoft\Db\Query\Conditions\InConditionBuilder as BaseInConditionBuilder;
 use Yiisoft\Db\Query\Query;
 use Yiisoft\Db\Query\QueryBuilder;
-use Yiisoft\Db\Sqlite\ConnectionPDOSqlite;
 
 use function implode;
 use function is_array;
@@ -60,15 +59,12 @@ final class InConditionBuilder extends BaseInConditionBuilder
      */
     protected function buildCompositeInCondition(?string $operator, $columns, $values, array &$params = []): string
     {
-        /** @var ConnectionPDOSqlite $db */
-        $db = $this->queryBuilder->getDb();
-
         $quotedColumns = [];
 
         /** @psalm-var array<array-key, string>|Traversable $columns */
         foreach ($columns as $i => $column) {
             $quotedColumns[$i] = strpos($column, '(') === false
-                ? $db->quoteColumnName($column) : $column;
+                ? $this->queryBuilder->getQuoter()->quoteColumnName($column) : $column;
         }
 
         $vss = [];

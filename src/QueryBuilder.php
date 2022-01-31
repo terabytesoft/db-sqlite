@@ -69,8 +69,9 @@ final class QueryBuilder extends BaseQueryBuilder
 
     public function __construct(private ConnectionInterface $db)
     {
-        parent::__construct($db);
+        parent::__construct($db->getQuoter(), $db->getSchema());
     }
+
 
     /**
      * Contains array of default expression builders. Extend this method and override it, if you want to change default
@@ -148,7 +149,7 @@ final class QueryBuilder extends BaseQueryBuilder
                     $value = $columnSchemas[$columns[$i]]->dbTypecast($value);
                 }
                 if (is_string($value)) {
-                    $value = $schema->quoteValue($value);
+                    $value = $this->db->getQuoter()->quoteValue($value);
                 } elseif (is_float($value)) {
                     /** ensure type cast always has . as decimal separator in all locales */
                     $value = NumericHelper::normalize($value);
@@ -170,10 +171,10 @@ final class QueryBuilder extends BaseQueryBuilder
 
         /** @psalm-var array<array-key, string> $columns */
         foreach ($columns as $i => $name) {
-            $columns[$i] = $schema->quoteColumnName($name);
+            $columns[$i] = $this->db->getQuoter()->quoteColumnName($name);
         }
 
-        return 'INSERT INTO ' . $schema->quoteTableName($table)
+        return 'INSERT INTO ' . $this->db->getQuoter()->quoteTableName($table)
         . ' (' . implode(', ', $columns) . ') SELECT ' . implode(' UNION SELECT ', $values);
     }
 
@@ -197,10 +198,10 @@ final class QueryBuilder extends BaseQueryBuilder
         $table = $this->db->getTableSchema($tableName);
 
         if ($table !== null && $table->getSequenceName() !== null) {
-            $tableName = $this->db->quoteTableName($tableName);
+            $tableName = $this->db->getQuoter()->quoteTableName($tableName);
             if ($value === null) {
                 $pk = $table->getPrimaryKey();
-                $key = $this->db->quoteColumnName(reset($pk));
+                $key = $this->db->getQuoter()->quoteColumnName(reset($pk));
                 $value = $this->db->useMaster(static function (ConnectionInterface $db) use ($key, $tableName) {
                     return $db->createCommand("SELECT MAX($key) FROM $tableName")->queryScalar();
                 });
@@ -241,7 +242,7 @@ final class QueryBuilder extends BaseQueryBuilder
      */
     public function truncateTable(string $table): string
     {
-        return 'DELETE FROM ' . $this->db->quoteTableName($table);
+        return 'DELETE FROM ' . $this->db->getQuoter()->quoteTableName($table);
     }
 
     /**
@@ -254,7 +255,7 @@ final class QueryBuilder extends BaseQueryBuilder
      */
     public function dropIndex(string $name, string $table): string
     {
-        return 'DROP INDEX ' . $this->db->quoteTableName($name);
+        return 'DROP INDEX ' . $this->db->getQuoter()->quoteTableName($name);
     }
 
     /**
@@ -347,9 +348,9 @@ final class QueryBuilder extends BaseQueryBuilder
     public function renameTable(string $oldName, string $newName): string
     {
         return 'ALTER TABLE ' .
-            $this->db->quoteTableName($oldName) .
+            $this->db->getQuoter()->quoteTableName($oldName) .
             ' RENAME TO ' .
-            $this->db->quoteTableName($newName);
+            $this->db->getQuoter()->quoteTableName($newName);
     }
 
     /**
@@ -690,8 +691,8 @@ final class QueryBuilder extends BaseQueryBuilder
         }
 
         return ($unique ? 'CREATE UNIQUE INDEX ' : 'CREATE INDEX ')
-            . $this->db->quoteTableName(($schema ? $schema . '.' : '') . $name) . ' ON '
-            . $this->db->quoteTableName($table)
+            . $this->db->getQuoter()->quoteTableName(($schema ? $schema . '.' : '') . $name) . ' ON '
+            . $this->db->getQuoter()->quoteTableName($table)
             . ' (' . $this->buildColumns($columns) . ')';
     }
 
@@ -783,7 +784,7 @@ final class QueryBuilder extends BaseQueryBuilder
          */
         [, $placeholders, $values, $params] = $this->prepareInsertValues($table, $insertColumns, $params);
 
-        $insertSql = 'INSERT OR IGNORE INTO ' . $this->db->quoteTableName($table)
+        $insertSql = 'INSERT OR IGNORE INTO ' . $this->db->getQuoter()->quoteTableName($table)
             . (!empty($insertNames) ? ' (' . implode(', ', $insertNames) . ')' : '')
             . (!empty($placeholders) ? ' VALUES (' . implode(', ', $placeholders) . ')' : "$values");
 
@@ -792,14 +793,14 @@ final class QueryBuilder extends BaseQueryBuilder
         }
 
         $updateCondition = ['or'];
-        $quotedTableName = $this->db->quoteTableName($table);
+        $quotedTableName = $this->db->getQuoter()->quoteTableName($table);
 
         foreach ($constraints as $constraint) {
             $constraintCondition = ['and'];
             /** @psalm-var array<array-key, string> */
             $columnsNames = $constraint->getColumnNames();
             foreach ($columnsNames as $name) {
-                $quotedName = $this->db->quoteColumnName($name);
+                $quotedName = $this->db->getQuoter()->quoteColumnName($name);
                 $constraintCondition[] = "$quotedTableName.$quotedName=(SELECT $quotedName FROM `EXCLUDED`)";
             }
             $updateCondition[] = $constraintCondition;
@@ -808,7 +809,7 @@ final class QueryBuilder extends BaseQueryBuilder
         if ($updateColumns === true) {
             $updateColumns = [];
             foreach ($updateNames as $name) {
-                $quotedName = $this->db->quoteColumnName($name);
+                $quotedName = $this->db->getQuoter()->quoteColumnName($name);
 
                 if (strrpos($quotedName, '.') === false) {
                     $quotedName = "(SELECT $quotedName FROM `EXCLUDED`)";
