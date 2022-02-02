@@ -8,8 +8,9 @@ use Closure;
 use Yiisoft\Arrays\ArrayHelper;
 use Yiisoft\Db\Connection\ConnectionInterface;
 use Yiisoft\Db\Query\Query;
-use Yiisoft\Db\Sqlite\QueryBuilder;
-use Yiisoft\Db\Sqlite\Schema;
+use Yiisoft\Db\Query\QueryBuilderInterface;
+use Yiisoft\Db\Sqlite\PDO\QueryBuilderPDOSqlite;
+use Yiisoft\Db\Sqlite\PDO\SchemaPDOSqlite;
 use Yiisoft\Db\TestSupport\TestQueryBuilderTrait;
 use Yiisoft\Db\TestSupport\TraversableObject;
 
@@ -23,11 +24,11 @@ final class QueryBuilderTest extends TestCase
     protected string $likeEscapeCharSql = " ESCAPE '\\'";
 
     /**
-     * @return QueryBuilder
+     * @return QueryBuilderInterface
      */
-    protected function getQueryBuilder(ConnectionInterface $db): QueryBuilder
+    protected function getQueryBuilder(ConnectionInterface $db): QueryBuilderInterface
     {
-        return new QueryBuilder($this->getConnection($db));
+        return new QueryBuilderPDOSqlite($this->getConnection($db));
     }
 
     public function testBuildUnion(): void
@@ -285,7 +286,7 @@ final class QueryBuilderTest extends TestCase
         $tableName = 'mytable';
         $result['with schema'] = [
             "CREATE INDEX {{{$schemaName}}}.[[$indexName]] ON {{{$tableName}}} ([[C_index_1]])",
-            function (QueryBuilder $qb) use ($tableName, $indexName, $schemaName) {
+            function (QueryBuilderInterface $qb) use ($tableName, $indexName, $schemaName) {
                 return $qb->createIndex($indexName, $schemaName . '.' . $tableName, 'C_index_1');
             },
         ];
@@ -391,10 +392,10 @@ final class QueryBuilderTest extends TestCase
         foreach ($this->columnTypes() as [$column, $builder, $expected]) {
             if (
                 !(
-                    strncmp($column, Schema::TYPE_PK, 2) === 0 ||
-                    strncmp($column, Schema::TYPE_UPK, 3) === 0 ||
-                    strncmp($column, Schema::TYPE_BIGPK, 5) === 0 ||
-                    strncmp($column, Schema::TYPE_UBIGPK, 6) === 0 ||
+                    strncmp($column, SchemaPDOSqlite::TYPE_PK, 2) === 0 ||
+                    strncmp($column, SchemaPDOSqlite::TYPE_UPK, 3) === 0 ||
+                    strncmp($column, SchemaPDOSqlite::TYPE_BIGPK, 5) === 0 ||
+                    strncmp($column, SchemaPDOSqlite::TYPE_UBIGPK, 6) === 0 ||
                     strncmp(substr($column, -5), 'FIRST', 5) === 0
                 )
             ) {

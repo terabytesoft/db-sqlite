@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Yiisoft\Db\Sqlite;
+namespace Yiisoft\Db\Sqlite\PDO;
 
 use Generator;
 use JsonException;
@@ -19,8 +19,7 @@ use Yiisoft\Db\Expression\ExpressionInterface;
 use Yiisoft\Db\Query\Conditions\InCondition;
 use Yiisoft\Db\Query\Conditions\LikeCondition;
 use Yiisoft\Db\Query\Query;
-use Yiisoft\Db\Query\QueryBuilder as BaseQueryBuilder;
-use Yiisoft\Db\Schema\Schema;
+use Yiisoft\Db\Query\QueryBuilder;
 use Yiisoft\Db\Sqlite\Condition\InConditionBuilder;
 use Yiisoft\Db\Sqlite\Condition\LikeConditionBuilder;
 use Yiisoft\Strings\NumericHelper;
@@ -36,7 +35,7 @@ use function strrpos;
 use function trim;
 use function version_compare;
 
-final class QueryBuilder extends BaseQueryBuilder
+final class QueryBuilderPDOSqlite extends QueryBuilder
 {
     /**
      * @var array mapping from abstract column types (keys) to physical column types (values).
@@ -44,49 +43,32 @@ final class QueryBuilder extends BaseQueryBuilder
      * @psalm-var array<string, string>
      */
     protected array $typeMap = [
-        Schema::TYPE_PK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
-        Schema::TYPE_UPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
-        Schema::TYPE_BIGPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
-        Schema::TYPE_UBIGPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
-        Schema::TYPE_CHAR => 'char(1)',
-        Schema::TYPE_STRING => 'varchar(255)',
-        Schema::TYPE_TEXT => 'text',
-        Schema::TYPE_TINYINT => 'tinyint',
-        Schema::TYPE_SMALLINT => 'smallint',
-        Schema::TYPE_INTEGER => 'integer',
-        Schema::TYPE_BIGINT => 'bigint',
-        Schema::TYPE_FLOAT => 'float',
-        Schema::TYPE_DOUBLE => 'double',
-        Schema::TYPE_DECIMAL => 'decimal(10,0)',
-        Schema::TYPE_DATETIME => 'datetime',
-        Schema::TYPE_TIMESTAMP => 'timestamp',
-        Schema::TYPE_TIME => 'time',
-        Schema::TYPE_DATE => 'date',
-        Schema::TYPE_BINARY => 'blob',
-        Schema::TYPE_BOOLEAN => 'boolean',
-        Schema::TYPE_MONEY => 'decimal(19,4)',
+        SchemaPDOSqlite::TYPE_PK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
+        SchemaPDOSqlite::TYPE_UPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
+        SchemaPDOSqlite::TYPE_BIGPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
+        SchemaPDOSqlite::TYPE_UBIGPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
+        SchemaPDOSqlite::TYPE_CHAR => 'char(1)',
+        SchemaPDOSqlite::TYPE_STRING => 'varchar(255)',
+        SchemaPDOSqlite::TYPE_TEXT => 'text',
+        SchemaPDOSqlite::TYPE_TINYINT => 'tinyint',
+        SchemaPDOSqlite::TYPE_SMALLINT => 'smallint',
+        SchemaPDOSqlite::TYPE_INTEGER => 'integer',
+        SchemaPDOSqlite::TYPE_BIGINT => 'bigint',
+        SchemaPDOSqlite::TYPE_FLOAT => 'float',
+        SchemaPDOSqlite::TYPE_DOUBLE => 'double',
+        SchemaPDOSqlite::TYPE_DECIMAL => 'decimal(10,0)',
+        SchemaPDOSqlite::TYPE_DATETIME => 'datetime',
+        SchemaPDOSqlite::TYPE_TIMESTAMP => 'timestamp',
+        SchemaPDOSqlite::TYPE_TIME => 'time',
+        SchemaPDOSqlite::TYPE_DATE => 'date',
+        SchemaPDOSqlite::TYPE_BINARY => 'blob',
+        SchemaPDOSqlite::TYPE_BOOLEAN => 'boolean',
+        SchemaPDOSqlite::TYPE_MONEY => 'decimal(19,4)',
     ];
 
     public function __construct(private ConnectionInterface $db)
     {
         parent::__construct($db->getQuoter(), $db->getSchema());
-    }
-
-
-    /**
-     * Contains array of default expression builders. Extend this method and override it, if you want to change default
-     * expression builders for this query builder.
-     *
-     * @return array
-     *
-     * See {@see ExpressionBuilder} docs for details.
-     */
-    protected function defaultExpressionBuilders(): array
-    {
-        return array_merge(parent::defaultExpressionBuilders(), [
-            LikeCondition::class => LikeConditionBuilder::class,
-            InCondition::class => InConditionBuilder::class,
-        ]);
     }
 
     /**
@@ -823,5 +805,21 @@ final class QueryBuilder extends BaseQueryBuilder
             : ltrim("$values", ' ')) . ') ' . $this->update($table, $updateColumns, $updateCondition, $params);
 
         return "$updateSql; $insertSql;";
+    }
+
+    /**
+     * Contains array of default expression builders. Extend this method and override it, if you want to change default
+     * expression builders for this query builder.
+     *
+     * @return array
+     *
+     * See {@see ExpressionBuilder} docs for details.
+     */
+    protected function defaultExpressionBuilders(): array
+    {
+        return array_merge(parent::defaultExpressionBuilders(), [
+            LikeCondition::class => LikeConditionBuilder::class,
+            InCondition::class => InConditionBuilder::class,
+        ]);
     }
 }

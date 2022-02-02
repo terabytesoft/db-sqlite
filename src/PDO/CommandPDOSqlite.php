@@ -2,12 +2,20 @@
 
 declare(strict_types=1);
 
-namespace Yiisoft\Db\Sqlite;
+namespace Yiisoft\Db\Sqlite\PDO;
 
+use PDOException;
 use Throwable;
+use Yiisoft\Db\Cache\QueryCache;
 use Yiisoft\Db\Command\Command as BaseCommand;
+use Yiisoft\Db\Connection\ConnectionPDOInterface;
 use Yiisoft\Db\Exception\Exception;
 use Yiisoft\Db\Exception\InvalidArgumentException;
+use Yiisoft\Db\Query\QueryBuilderInterface;
+use Yiisoft\Db\Schema\QuoterInterface;
+use Yiisoft\Db\Schema\SchemaInterface;
+use Yiisoft\Db\Sqlite\SqlToken;
+use Yiisoft\Db\Sqlite\SqlTokenizer;
 use Yiisoft\Strings\StringHelper;
 
 use function array_pop;
@@ -16,8 +24,50 @@ use function ltrim;
 use function preg_match_all;
 use function strpos;
 
-final class Command extends BaseCommand
+final class CommandPDOSqlite extends BaseCommand
 {
+    public function __construct(
+        private ConnectionPDOInterface $db,
+        private QueryBuilderInterface $queryBuilder,
+        private QueryCache $queryCache,
+        private QuoterInterface $quoter,
+        private SchemaInterface $schema
+    ) {
+        parent::__construct($queryBuilder, $queryCache, $quoter, $schema);
+    }
+
+    public function prepare(?bool $forRead = null): void
+    {
+        if (isset($this->pdoStatement)) {
+            $this->bindPendingParams();
+
+            return;
+        }
+
+        $sql = $this->getSql();
+
+        if ($this->db->getTransaction()) {
+            /** master is in a transaction. use the same connection. */
+            $forRead = false;
+        }
+
+        if ($forRead || ($forRead === null && $this->schema->isReadQuery($sql))) {
+            $pdo = $this->db->getSlavePdo();
+        } else {
+            $pdo = $this->db->getMasterPdo();
+        }
+
+        try {
+            $this->pdoStatement = $pdo->prepare($sql);
+            $this->bindPendingParams();
+        } catch (PDOException $e) {
+            $message = $e->getMessage() . "\nFailed to prepare SQL: $sql";
+            $errorInfo = $e instanceof PDOException ? $e->errorInfo : null;
+
+            throw new Exception($message, $errorInfo, $e);
+        }
+    }
+
     /**
      * Executes the SQL statement.
      *
@@ -57,6 +107,45 @@ final class Command extends BaseCommand
         return $result;
     }
 
+    protected function getCacheKey(string $method, ?int $fetchMode, string $rawSql): array
+    {
+        return [
+            __CLASS__,
+            $method,
+            $fetchMode,
+            $this->db->getDriver()->getDsn(),
+            $this->db->getDriver()->getUsername(),
+            $rawSql,
+        ];
+    }
+
+    protected function internalExecute(?string $rawSql): void
+    {
+        $attempt = 0;
+
+        while (true) {
+            try {
+                if (
+                    ++$attempt === 1
+                    && $this->isolationLevel !== null
+                    && $this->db->getTransaction() === null
+                ) {
+                    $this->db->transaction(fn ($rawSql) => $this->internalExecute($rawSql), $this->isolationLevel);
+                } else {
+                    $this->pdoStatement->execute();
+                }
+                break;
+            } catch (\Exception $e) {
+                $rawSql = $rawSql ?: $this->getRawSql();
+                $e = $this->schema->convertException($e, $rawSql);
+
+                if ($this->retryHandler === null || !($this->retryHandler)($e, $attempt)) {
+                    throw $e;
+                }
+            }
+        }
+    }
+
     /**
      * Performs the actual DB query of a SQL statement.
      *
@@ -69,7 +158,7 @@ final class Command extends BaseCommand
      *
      * @return mixed the method execution result.
      */
-    protected function queryInternal(string $method, $fetchMode = null)
+    protected function queryInternal(string $method, array|int $fetchMode = null): mixed
     {
         $sql = $this->getSql() ?? '';
 

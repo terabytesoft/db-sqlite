@@ -26,7 +26,9 @@ final class CommandTest extends TestCase
     {
         $db = $this->getConnection();
         $this->expectException(NotSupportedException::class);
-        $this->expectExceptionMessage('Yiisoft\Db\Sqlite\QueryBuilder::addForeignKey is not supported by SQLite.');
+        $this->expectExceptionMessage(
+            'Yiisoft\Db\Sqlite\PDO\QueryBuilderPDOSqlite::addForeignKey is not supported by SQLite.'
+        );
         $db->createCommand()->addForeignKey(
             'test_fk_constraint',
             'students',
@@ -40,7 +42,9 @@ final class CommandTest extends TestCase
     {
         $db = $this->getConnection();
         $this->expectException(NotSupportedException::class);
-        $this->expectExceptionMessage('Yiisoft\Db\Sqlite\QueryBuilder::addUnique is not supported by SQLite.');
+        $this->expectExceptionMessage(
+            'Yiisoft\Db\Sqlite\PDO\QueryBuilderPDOSqlite::addUnique is not supported by SQLite.'
+        );
         $db->createCommand()->addUnique('test_fk_constraint', 'students', ['Department_id'])->execute();
     }
 
@@ -56,7 +60,9 @@ final class CommandTest extends TestCase
     {
         $db = $this->getConnection();
         $this->expectException(NotSupportedException::class);
-        $this->expectExceptionMessage('Yiisoft\Db\Sqlite\QueryBuilder::dropForeignKey is not supported by SQLite.');
+        $this->expectExceptionMessage(
+            'Yiisoft\Db\Sqlite\PDO\QueryBuilderPDOSqlite::dropForeignKey is not supported by SQLite.'
+        );
         $db->createCommand()->dropForeignKey('departments', 'test_fk_constraint')->execute();
     }
 
@@ -64,7 +70,9 @@ final class CommandTest extends TestCase
     {
         $db = $this->getConnection();
         $this->expectException(NotSupportedException::class);
-        $this->expectExceptionMessage('Yiisoft\Db\Sqlite\QueryBuilder::dropUnique is not supported by SQLite.');
+        $this->expectExceptionMessage(
+            'Yiisoft\Db\Sqlite\PDO\QueryBuilderPDOSqlite::dropUnique is not supported by SQLite.'
+        );
         $db->createCommand()->dropUnique('departments', 'test_fk_constraint')->execute();
     }
 
@@ -72,7 +80,9 @@ final class CommandTest extends TestCase
     {
         $db = $this->getConnection();
         $this->expectException(NotSupportedException::class);
-        $this->expectExceptionMessage('Yiisoft\Db\Sqlite\QueryBuilder::addForeignKey is not supported by SQLite.');
+        $this->expectExceptionMessage(
+            'Yiisoft\Db\Sqlite\PDO\QueryBuilderPDOSqlite::addForeignKey is not supported by SQLite.'
+        );
         $db->createCommand()->addForeignKey(
             'test_fk_constraint',
             'students',

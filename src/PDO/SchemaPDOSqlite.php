@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Yiisoft\Db\Sqlite;
+namespace Yiisoft\Db\Sqlite\PDO;
 
+use PDO;
 use Throwable;
 use Yiisoft\Arrays\ArrayHelper;
 use Yiisoft\Arrays\ArraySorter;
@@ -22,6 +23,10 @@ use Yiisoft\Db\Exception\NotSupportedException;
 use Yiisoft\Db\Expression\Expression;
 use Yiisoft\Db\Schema\ColumnSchema;
 use Yiisoft\Db\Schema\Schema as AbstractSchema;
+use Yiisoft\Db\Sqlite\ColumnSchemaBuilder;
+use Yiisoft\Db\Sqlite\SqlToken;
+use Yiisoft\Db\Sqlite\SqlTokenizer;
+use Yiisoft\Db\Sqlite\TableSchema;
 use Yiisoft\Db\Transaction\Transaction;
 
 use function count;
@@ -83,7 +88,7 @@ use function trim;
  *   array{cid:string, name:string, type:string, notnull:string, dflt_value:string|null, pk:string}
  * >
  */
-final class Schema extends AbstractSchema implements ConstraintFinderInterface
+final class SchemaPDOSqlite extends AbstractSchema implements ConstraintFinderInterface
 {
     use ConstraintFinderTrait;
 
@@ -135,9 +140,11 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
      */
     protected $columnQuoteCharacter = '`';
 
+    private ?string $serverVersion = null;
+
     public function __construct(private ConnectionPDOInterface $db, SchemaCache $schemaCache)
     {
-        parent::__construct($db, $schemaCache);
+        parent::__construct($schemaCache);
     }
 
     /**
@@ -673,5 +680,147 @@ final class Schema extends AbstractSchema implements ConstraintFinderInterface
         return $this->db->createCommand(
             'PRAGMA TABLE_INFO(' . $this->db->getQuoter()->quoteSimpleTableName($tableName) . ')'
         )->queryAll();
+    }
+
+    public function rollBackSavepoint(string $name): void
+    {
+        $this->db->createCommand("ROLLBACK TO SAVEPOINT $name")->execute();
+    }
+
+    /**
+     * Returns the actual name of a given table name.
+     *
+     * This method will strip off curly brackets from the given table name and replace the percentage character '%' with
+     * {@see ConnectionInterface::tablePrefix}.
+     *
+     * @param string $name the table name to be converted.
+     *
+     * @return string the real name of the given table name.
+     */
+    public function getRawTableName(string $name): string
+    {
+        if (strpos($name, '{{') !== false) {
+            $name = preg_replace('/{{(.*?)}}/', '\1', $name);
+
+            return str_replace('%', $this->db->getTablePrefix(), $name);
+        }
+
+        return $name;
+    }
+
+    /**
+     * Returns the cache key for the specified table name.
+     *
+     * @param string $name the table name.
+     *
+     * @return array the cache key.
+     */
+    protected function getCacheKey(string $name): array
+    {
+        return [
+            __CLASS__,
+            $this->db->getDriver()->getDsn(),
+            $this->db->getDriver()->getUsername(),
+            $this->getRawTableName($name),
+        ];
+    }
+
+    /**
+     * Returns the cache tag name.
+     *
+     * This allows {@see refresh()} to invalidate all cached table schemas.
+     *
+     * @return string the cache tag name.
+     */
+    protected function getCacheTag(): string
+    {
+        return md5(serialize([
+            __CLASS__,
+            $this->db->getDriver()->getDsn(),
+            $this->db->getDriver()->getUsername(),
+        ]));
+    }
+
+    /**
+     * Returns a server version as a string comparable by {@see version_compare()}.
+     *
+     * @throws Exception
+     *
+     * @return string server version as a string.
+     */
+    public function getServerVersion(): string
+    {
+        if ($this->serverVersion === null) {
+            $this->serverVersion = $this->db->getSlavePdo()->getAttribute(PDO::ATTR_SERVER_VERSION);
+        }
+
+        return $this->serverVersion;
+    }
+
+    /**
+     * Changes row's array key case to lower if PDO's one is set to uppercase.
+     *
+     * @param array $row row's array or an array of row's arrays.
+     * @param bool $multiple whether multiple rows or a single row passed.
+     *
+     * @throws Exception
+     *
+     * @return array normalized row or rows.
+     */
+    protected function normalizePdoRowKeyCase(array $row, bool $multiple): array
+    {
+        if ($this->db->getSlavePdo()->getAttribute(PDO::ATTR_CASE) !== PDO::CASE_UPPER) {
+            return $row;
+        }
+
+        if ($multiple) {
+            return array_map(static function (array $row) {
+                return array_change_key_case($row, CASE_LOWER);
+            }, $row);
+        }
+
+        return array_change_key_case($row, CASE_LOWER);
+    }
+
+    /**
+     * @return bool whether this DBMS supports [savepoint](http://en.wikipedia.org/wiki/Savepoint).
+     */
+    public function supportsSavepoint(): bool
+    {
+        return $this->db->isSavepointEnabled();
+    }
+
+    /**
+     * Creates a new savepoint.
+     *
+     * @param string $name the savepoint name
+     *
+     * @throws Exception|InvalidConfigException|Throwable
+     */
+    public function createSavepoint(string $name): void
+    {
+        $this->db->createCommand("SAVEPOINT $name")->execute();
+    }
+
+    /**
+     * Returns the ID of the last inserted row or sequence value.
+     *
+     * @param string $sequenceName name of the sequence object (required by some DBMS)
+     *
+     * @throws InvalidCallException if the DB connection is not active
+     *
+     * @return string the row ID of the last row inserted, or the last value retrieved from the sequence object
+     *
+     * @see http://www.php.net/manual/en/function.PDO-lastInsertId.php
+     */
+    public function getLastInsertID(string $sequenceName = ''): string
+    {
+        if ($this->db->isActive()) {
+            return $this->db->getPDO()->lastInsertId(
+                $sequenceName === '' ? null : $this->db->getQuoter()->quoteTableName($sequenceName)
+            );
+        }
+
+        throw new InvalidCallException('DB Connection is not active.');
     }
 }
