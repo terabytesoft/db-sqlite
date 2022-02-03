@@ -12,7 +12,6 @@ use Yiisoft\Db\Cache\SchemaCache;
 use Yiisoft\Db\Connection\ConnectionPDOInterface;
 use Yiisoft\Db\Constraint\CheckConstraint;
 use Yiisoft\Db\Constraint\Constraint;
-use Yiisoft\Db\Constraint\ConstraintFinderInterface;
 use Yiisoft\Db\Constraint\ConstraintFinderTrait;
 use Yiisoft\Db\Constraint\ForeignKeyConstraint;
 use Yiisoft\Db\Constraint\IndexConstraint;
@@ -22,12 +21,11 @@ use Yiisoft\Db\Exception\InvalidConfigException;
 use Yiisoft\Db\Exception\NotSupportedException;
 use Yiisoft\Db\Expression\Expression;
 use Yiisoft\Db\Schema\ColumnSchema;
-use Yiisoft\Db\Schema\Schema as AbstractSchema;
+use Yiisoft\Db\Schema\Schema;
 use Yiisoft\Db\Sqlite\ColumnSchemaBuilder;
 use Yiisoft\Db\Sqlite\SqlToken;
 use Yiisoft\Db\Sqlite\SqlTokenizer;
 use Yiisoft\Db\Sqlite\TableSchema;
-use Yiisoft\Db\Transaction\Transaction;
 
 use function count;
 use function explode;
@@ -41,7 +39,7 @@ use function trim;
  * Schema is the class for retrieving metadata from a SQLite (2/3) database.
  *
  * @property string $transactionIsolationLevel The transaction isolation level to use for this transaction. This can be
- * either {@see Transaction::READ_UNCOMMITTED} or {@see Transaction::SERIALIZABLE}.
+ * either {@see TransactionPDOSqlite::READ_UNCOMMITTED} or {@see TransactionPDOSqlite::SERIALIZABLE}.
  *
  * @psalm-type Column = array<array-key, array{seqno:string, cid:string, name:string}>
  *
@@ -88,10 +86,8 @@ use function trim;
  *   array{cid:string, name:string, type:string, notnull:string, dflt_value:string|null, pk:string}
  * >
  */
-final class SchemaPDOSqlite extends AbstractSchema implements ConstraintFinderInterface
+final class SchemaPDOSqlite extends Schema
 {
-    use ConstraintFinderTrait;
-
     /**
      * @var array mapping from physical column types (keys) to abstract column types (values)
      *
@@ -531,7 +527,7 @@ final class SchemaPDOSqlite extends AbstractSchema implements ConstraintFinderIn
      * Sets the isolation level of the current transaction.
      *
      * @param string $level The transaction isolation level to use for this transaction. This can be either
-     * {@see Transaction::READ_UNCOMMITTED} or {@see Transaction::SERIALIZABLE}.
+     * {@see TransactionPDOSqlite::READ_UNCOMMITTED} or {@see TransactionPDOSqlite::SERIALIZABLE}.
      *
      * @throws Exception|InvalidConfigException|NotSupportedException|Throwable when unsupported isolation levels are
      * used. SQLite only supports SERIALIZABLE and READ UNCOMMITTED.
@@ -541,10 +537,10 @@ final class SchemaPDOSqlite extends AbstractSchema implements ConstraintFinderIn
     public function setTransactionIsolationLevel(string $level): void
     {
         switch ($level) {
-            case Transaction::SERIALIZABLE:
+            case TransactionPDOSqlite::SERIALIZABLE:
                 $this->db->createCommand('PRAGMA read_uncommitted = False;')->execute();
                 break;
-            case Transaction::READ_UNCOMMITTED:
+            case TransactionPDOSqlite::READ_UNCOMMITTED:
                 $this->db->createCommand('PRAGMA read_uncommitted = True;')->execute();
                 break;
             default:

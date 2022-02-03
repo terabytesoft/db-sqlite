@@ -7,7 +7,7 @@ namespace Yiisoft\Db\Sqlite\PDO;
 use PDOException;
 use Throwable;
 use Yiisoft\Db\Cache\QueryCache;
-use Yiisoft\Db\Command\Command as BaseCommand;
+use Yiisoft\Db\Command\Command;
 use Yiisoft\Db\Connection\ConnectionPDOInterface;
 use Yiisoft\Db\Exception\Exception;
 use Yiisoft\Db\Exception\InvalidArgumentException;
@@ -24,7 +24,7 @@ use function ltrim;
 use function preg_match_all;
 use function strpos;
 
-final class CommandPDOSqlite extends BaseCommand
+final class CommandPDOSqlite extends Command
 {
     public function __construct(
         private ConnectionPDOInterface $db,
@@ -62,7 +62,7 @@ final class CommandPDOSqlite extends BaseCommand
             $this->bindPendingParams();
         } catch (PDOException $e) {
             $message = $e->getMessage() . "\nFailed to prepare SQL: $sql";
-            $errorInfo = $e instanceof PDOException ? $e->errorInfo : null;
+            $errorInfo = $e->errorInfo ?? null;
 
             throw new Exception($message, $errorInfo, $e);
         }

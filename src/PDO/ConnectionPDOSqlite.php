@@ -19,6 +19,7 @@ use Yiisoft\Db\Query\QueryBuilderInterface;
 use Yiisoft\Db\Schema\Quoter;
 use Yiisoft\Db\Schema\QuoterInterface;
 use Yiisoft\Db\Schema\SchemaInterface;
+use Yiisoft\Db\Transaction\TransactionInterface;
 
 use function constant;
 use function strncmp;
@@ -101,6 +102,11 @@ final class ConnectionPDOSqlite extends Connection implements ConnectionPDOInter
         }
 
         return $command->bindValues($params);
+    }
+
+    public function createTransaction(): TransactionInterface
+    {
+        return new TransactionPDOSqlite($this);
     }
 
     public function close(): void
