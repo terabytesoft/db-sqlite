@@ -20,6 +20,7 @@ use Yiisoft\Db\Query\Conditions\InCondition;
 use Yiisoft\Db\Query\Conditions\LikeCondition;
 use Yiisoft\Db\Query\Query;
 use Yiisoft\Db\Query\QueryBuilder;
+use Yiisoft\Db\Schema\Schema;
 use Yiisoft\Db\Sqlite\Condition\InConditionBuilder;
 use Yiisoft\Db\Sqlite\Condition\LikeConditionBuilder;
 use Yiisoft\Strings\NumericHelper;
@@ -43,27 +44,27 @@ final class QueryBuilderPDOSqlite extends QueryBuilder
      * @psalm-var array<string, string>
      */
     protected array $typeMap = [
-        SchemaPDOSqlite::TYPE_PK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
-        SchemaPDOSqlite::TYPE_UPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
-        SchemaPDOSqlite::TYPE_BIGPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
-        SchemaPDOSqlite::TYPE_UBIGPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
-        SchemaPDOSqlite::TYPE_CHAR => 'char(1)',
-        SchemaPDOSqlite::TYPE_STRING => 'varchar(255)',
-        SchemaPDOSqlite::TYPE_TEXT => 'text',
-        SchemaPDOSqlite::TYPE_TINYINT => 'tinyint',
-        SchemaPDOSqlite::TYPE_SMALLINT => 'smallint',
-        SchemaPDOSqlite::TYPE_INTEGER => 'integer',
-        SchemaPDOSqlite::TYPE_BIGINT => 'bigint',
-        SchemaPDOSqlite::TYPE_FLOAT => 'float',
-        SchemaPDOSqlite::TYPE_DOUBLE => 'double',
-        SchemaPDOSqlite::TYPE_DECIMAL => 'decimal(10,0)',
-        SchemaPDOSqlite::TYPE_DATETIME => 'datetime',
-        SchemaPDOSqlite::TYPE_TIMESTAMP => 'timestamp',
-        SchemaPDOSqlite::TYPE_TIME => 'time',
-        SchemaPDOSqlite::TYPE_DATE => 'date',
-        SchemaPDOSqlite::TYPE_BINARY => 'blob',
-        SchemaPDOSqlite::TYPE_BOOLEAN => 'boolean',
-        SchemaPDOSqlite::TYPE_MONEY => 'decimal(19,4)',
+        Schema::TYPE_PK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
+        Schema::TYPE_UPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
+        Schema::TYPE_BIGPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
+        Schema::TYPE_UBIGPK => 'integer PRIMARY KEY AUTOINCREMENT NOT NULL',
+        Schema::TYPE_CHAR => 'char(1)',
+        Schema::TYPE_STRING => 'varchar(255)',
+        Schema::TYPE_TEXT => 'text',
+        Schema::TYPE_TINYINT => 'tinyint',
+        Schema::TYPE_SMALLINT => 'smallint',
+        Schema::TYPE_INTEGER => 'integer',
+        Schema::TYPE_BIGINT => 'bigint',
+        Schema::TYPE_FLOAT => 'float',
+        Schema::TYPE_DOUBLE => 'double',
+        Schema::TYPE_DECIMAL => 'decimal(10,0)',
+        Schema::TYPE_DATETIME => 'datetime',
+        Schema::TYPE_TIMESTAMP => 'timestamp',
+        Schema::TYPE_TIME => 'time',
+        Schema::TYPE_DATE => 'date',
+        Schema::TYPE_BINARY => 'blob',
+        Schema::TYPE_BOOLEAN => 'boolean',
+        Schema::TYPE_MONEY => 'decimal(19,4)',
     ];
 
     public function __construct(private ConnectionInterface $db)
@@ -88,14 +89,14 @@ final class QueryBuilderPDOSqlite extends QueryBuilder
      *
      * @param string $table the table that new rows will be inserted into.
      * @param array $columns the column names
-     * @param Generator|iterable $rows the rows to be batch inserted into the table
+     * @param iterable|Generator $rows the rows to be batched inserted into the table
      * @param array $params
      *
-     * @throws Exception|InvalidArgumentException|InvalidConfigException|NotSupportedException
-     *
      * @return string the batch INSERT SQL statement.
+     *@throws \Exception|InvalidArgumentException|InvalidConfigException|NotSupportedException
+     *
      */
-    public function batchInsert(string $table, array $columns, $rows, array &$params = []): string
+    public function batchInsert(string $table, array $columns, iterable|Generator $rows, array &$params = []): string
     {
         if (empty($rows)) {
             return '';
@@ -287,16 +288,16 @@ final class QueryBuilderPDOSqlite extends QueryBuilder
      * @param string|null $update the ON UPDATE option. Most DBMS support these options: RESTRICT, CASCADE, NO ACTION,
      * SET DEFAULT, SET NULL.
      *
-     * @throws NotSupportedException this is not supported by SQLite
-     *
      * @return string the SQL statement for adding a foreign key constraint to an existing table.
+     *@throws NotSupportedException this is not supported by SQLite
+     *
      */
     public function addForeignKey(
         string $name,
         string $table,
-        $columns,
+        array|string $columns,
         string $refTable,
-        $refColumns,
+        array|string $refColumns,
         ?string $delete = null,
         ?string $update = null
     ): string {
@@ -362,11 +363,11 @@ final class QueryBuilderPDOSqlite extends QueryBuilder
      * @param string $table the table that the primary key constraint will be added to.
      * @param array|string $columns comma separated string or array of columns that the primary key will consist of.
      *
-     * @throws Exception
-     *
      * @return string the SQL statement for adding a primary key constraint to an existing table.
+     *@throws Exception
+     *
      */
-    public function addPrimaryKey(string $name, string $table, $columns): string
+    public function addPrimaryKey(string $name, string $table, array|string $columns): string
     {
         throw new NotSupportedException(__METHOD__ . ' is not supported by SQLite.');
     }
@@ -387,7 +388,7 @@ final class QueryBuilderPDOSqlite extends QueryBuilder
     }
 
     /**
-     * Creates a SQL command for adding an unique constraint to an existing table.
+     * Creates a SQL command for adding a unique constraint to an existing table.
      *
      * @param string $name the name of the unique constraint. The name will be properly quoted by the method.
      * @param string $table the table that the unique constraint will be added to. The name will be properly quoted by
@@ -397,7 +398,7 @@ final class QueryBuilderPDOSqlite extends QueryBuilder
      *
      * @throws Exception
      *
-     * @return string the SQL statement for adding an unique constraint to an existing table.
+     * @return string the SQL statement for adding a unique constraint to an existing table.
      */
     public function addUnique(string $name, string $table, $columns): string
     {
@@ -405,7 +406,7 @@ final class QueryBuilderPDOSqlite extends QueryBuilder
     }
 
     /**
-     * Creates a SQL command for dropping an unique constraint.
+     * Creates a SQL command for dropping a unique constraint.
      *
      * @param string $name the name of the unique constraint to be dropped. The name will be properly quoted by the
      * method.
@@ -558,12 +559,12 @@ final class QueryBuilderPDOSqlite extends QueryBuilder
     }
 
     /**
-     * @param Expression|int|null $limit
-     * @param Expression|int|null $offset
+     * @param int|Expression|null $limit
+     * @param int|Expression|null $offset
      *
      * @return string the LIMIT and OFFSET clauses.
      */
-    public function buildLimit($limit, $offset): string
+    public function buildLimit(Expression|int|null $limit, Expression|int|null $offset): string
     {
         $sql = '';
 
@@ -634,13 +635,13 @@ final class QueryBuilderPDOSqlite extends QueryBuilder
         $union = $this->buildUnion($query->getUnion(), $params);
 
         if ($union !== '') {
-            $sql = "$sql{$this->separator}$union";
+            $sql = "$sql$this->separator$union";
         }
 
         $with = $this->buildWithQueries($query->getWithQueries(), $params);
 
         if ($with !== '') {
-            $sql = "$with{$this->separator}$sql";
+            $sql = "$with$this->separator$sql";
         }
 
         return [$sql, $params];
@@ -729,18 +730,18 @@ final class QueryBuilderPDOSqlite extends QueryBuilder
      * @param string $table the table that new rows will be inserted into/updated in.
      * @param array|Query $insertColumns the column data (name => value) to be inserted into the table or instance
      * of {@see Query} to perform `INSERT INTO ... SELECT` SQL statement.
-     * @param array|bool $updateColumns the column data (name => value) to be updated if they already exist.
+     * @param bool|array $updateColumns the column data (name => value) to be updated if they already exist.
      * If `true` is passed, the column data will be updated to match the insert column data.
      * If `false` is passed, no update will be performed if the column data already exists.
      * @param array $params the binding parameters that will be generated by this method.
      * They should be bound to the DB command later.
      *
-     * @throws Exception|InvalidConfigException|JsonException|NotSupportedException if this is not supported by the
+     * @return string the resulting SQL.
+     *@throws Exception|InvalidConfigException|JsonException|NotSupportedException if this is not supported by the
      * underlying DBMS.
      *
-     * @return string the resulting SQL.
      */
-    public function upsert(string $table, $insertColumns, $updateColumns, array &$params): string
+    public function upsert(string $table, Query|array $insertColumns, bool|array $updateColumns, array &$params): string
     {
         /** @var Constraint[] $constraints */
         $constraints = [];

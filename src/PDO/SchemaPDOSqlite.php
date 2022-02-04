@@ -12,11 +12,11 @@ use Yiisoft\Db\Cache\SchemaCache;
 use Yiisoft\Db\Connection\ConnectionPDOInterface;
 use Yiisoft\Db\Constraint\CheckConstraint;
 use Yiisoft\Db\Constraint\Constraint;
-use Yiisoft\Db\Constraint\ConstraintFinderTrait;
 use Yiisoft\Db\Constraint\ForeignKeyConstraint;
 use Yiisoft\Db\Constraint\IndexConstraint;
 use Yiisoft\Db\Exception\Exception;
 use Yiisoft\Db\Exception\InvalidArgumentException;
+use Yiisoft\Db\Exception\InvalidCallException;
 use Yiisoft\Db\Exception\InvalidConfigException;
 use Yiisoft\Db\Exception\NotSupportedException;
 use Yiisoft\Db\Expression\Expression;
@@ -123,20 +123,6 @@ final class SchemaPDOSqlite extends Schema
         'timestamp' => self::TYPE_TIMESTAMP,
         'enum' => self::TYPE_STRING,
     ];
-
-    /**
-     * @var string|string[] character used to quote schema, table, etc. names. An array of 2 characters can be used in
-     * case starting and ending characters are different.
-     */
-    protected $tableQuoteCharacter = '`';
-
-    /**
-     * @var string|string[] character used to quote column names. An array of 2 characters can be used in case starting
-     * and ending characters are different.
-     */
-    protected $columnQuoteCharacter = '`';
-
-    private ?string $serverVersion = null;
 
     public function __construct(private ConnectionPDOInterface $db, SchemaCache $schemaCache)
     {
@@ -311,7 +297,7 @@ final class SchemaPDOSqlite extends Schema
                     && $createTableToken->matches($pattern, (int) $firstMatchIndex - 2)
                 ) {
                     $sqlToken = $createTableToken[(int) $firstMatchIndex - 1];
-                    $name = $sqlToken !== null ? $sqlToken->getContent() : null;
+                    $name = $sqlToken?->getContent();
                 }
 
                 $result[] = (new CheckConstraint())->name($name)->expression($checkSql);
@@ -333,18 +319,6 @@ final class SchemaPDOSqlite extends Schema
     protected function loadTableDefaultValues(string $tableName): array
     {
         throw new NotSupportedException('SQLite does not support default value constraints.');
-    }
-
-    /**
-     * Creates a query builder for the MySQL database.
-     *
-     * This method may be overridden by child classes to create a DBMS-specific query builder.
-     *
-     * @return QueryBuilder query builder instance.
-     */
-    public function createQueryBuilder(): QueryBuilder
-    {
-        return new QueryBuilder($this->db);
     }
 
     /**
@@ -476,7 +450,7 @@ final class SchemaPDOSqlite extends Schema
         $column->allowNull(!$info['notnull']);
         $column->primaryKey($info['pk'] !== '0');
         $column->dbType(strtolower($info['type']));
-        $column->unsigned(strpos($column->getDbType(), 'unsigned') !== false);
+        $column->unsigned(str_contains($column->getDbType(), 'unsigned'));
         $column->type(self::TYPE_STRING);
 
         if (preg_match('/^(\w+)(?:\(([^)]+)\))?/', $column->getDbType(), $matches)) {
@@ -644,6 +618,9 @@ final class SchemaPDOSqlite extends Schema
         return new ColumnSchema();
     }
 
+    /**
+     * @throws Exception|InvalidConfigException|Throwable
+     */
     private function getPragmaForeignKeyList(string $tableName): array
     {
         return $this->db->createCommand(
@@ -665,12 +642,18 @@ final class SchemaPDOSqlite extends Schema
         return $column;
     }
 
+    /**
+     * @throws Exception|InvalidConfigException|Throwable
+     */
     private function getPragmaIndexList(string $tableName): array
     {
         return $this->db
             ->createCommand('PRAGMA INDEX_LIST(' . $this->db->getQuoter()->quoteValue($tableName) . ')')->queryAll();
     }
 
+    /**
+     * @throws Exception|InvalidConfigException|Throwable
+     */
     private function getPragmaTableInfo(string $tableName): array
     {
         return $this->db->createCommand(
@@ -695,7 +678,7 @@ final class SchemaPDOSqlite extends Schema
      */
     public function getRawTableName(string $name): string
     {
-        if (strpos($name, '{{') !== false) {
+        if (str_contains($name, '{{')) {
             $name = preg_replace('/{{(.*?)}}/', '\1', $name);
 
             return str_replace('%', $this->db->getTablePrefix(), $name);
@@ -738,23 +721,7 @@ final class SchemaPDOSqlite extends Schema
     }
 
     /**
-     * Returns a server version as a string comparable by {@see version_compare()}.
-     *
-     * @throws Exception
-     *
-     * @return string server version as a string.
-     */
-    public function getServerVersion(): string
-    {
-        if ($this->serverVersion === null) {
-            $this->serverVersion = $this->db->getSlavePdo()->getAttribute(PDO::ATTR_SERVER_VERSION);
-        }
-
-        return $this->serverVersion;
-    }
-
-    /**
-     * Changes row's array key case to lower if PDO's one is set to uppercase.
+     * Changes row's array key case to lower if PDO one is set to uppercase.
      *
      * @param array $row row's array or an array of row's arrays.
      * @param bool $multiple whether multiple rows or a single row passed.
@@ -765,7 +732,7 @@ final class SchemaPDOSqlite extends Schema
      */
     protected function normalizePdoRowKeyCase(array $row, bool $multiple): array
     {
-        if ($this->db->getSlavePdo()->getAttribute(PDO::ATTR_CASE) !== PDO::CASE_UPPER) {
+        if ($this->db->getSlavePdo()?->getAttribute(PDO::ATTR_CASE) !== PDO::CASE_UPPER) {
             return $row;
         }
 
@@ -818,5 +785,17 @@ final class SchemaPDOSqlite extends Schema
         }
 
         throw new InvalidCallException('DB Connection is not active.');
+    }
+
+    /**
+     * Releases an existing savepoint.
+     *
+     * @param string $name the savepoint name
+     *
+     * @throws Exception|InvalidConfigException|Throwable
+     */
+    public function releaseSavepoint(string $name): void
+    {
+        $this->db->createCommand("RELEASE SAVEPOINT $name")->execute();
     }
 }

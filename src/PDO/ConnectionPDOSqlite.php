@@ -23,18 +23,17 @@ use Yiisoft\Db\Transaction\TransactionInterface;
 
 use function constant;
 use function strncmp;
-use function substr;
 
 /**
  * Database connection class prefilled for MYSQL Server.
  */
 final class ConnectionPDOSqlite extends Connection implements ConnectionPDOInterface
 {
-    private ?CommandInterface $command = null;
     private ?PDO $pdo = null;
     private ?QueryBuilderInterface $queryBuilder = null;
     private ?QuoterInterface $quoter = null;
     private ?SchemaInterface $schema = null;
+    private string $serverVersion = '';
 
     public function __construct(
         private PDODriver $driver,
@@ -176,6 +175,20 @@ final class ConnectionPDOSqlite extends Connection implements ConnectionPDOInter
         }
 
         return $this->quoter;
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function getServerVersion(): string
+    {
+        if ($this->serverVersion === '') {
+            /** @var mixed */
+            $version = $this->getSlavePDO()?->getAttribute(PDO::ATTR_SERVER_VERSION);
+            $this->serverVersion = is_string($version) ? $version : 'Version could not be determined.';
+        }
+
+        return $this->serverVersion;
     }
 
     public function getSchema(): SchemaInterface

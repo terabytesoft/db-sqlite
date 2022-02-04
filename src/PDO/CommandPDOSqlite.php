@@ -28,9 +28,9 @@ final class CommandPDOSqlite extends Command
 {
     public function __construct(
         private ConnectionPDOInterface $db,
-        private QueryBuilderInterface $queryBuilder,
-        private QueryCache $queryCache,
-        private QuoterInterface $quoter,
+        QueryBuilderInterface $queryBuilder,
+        QueryCache $queryCache,
+        QuoterInterface $quoter,
         private SchemaInterface $schema
     ) {
         parent::__construct($queryBuilder, $queryCache, $quoter, $schema);
@@ -44,7 +44,7 @@ final class CommandPDOSqlite extends Command
             return;
         }
 
-        $sql = $this->getSql();
+        $sql = $this->getSql() ?? '';
 
         if ($this->db->getTransaction()) {
             /** master is in a transaction. use the same connection. */
@@ -58,7 +58,7 @@ final class CommandPDOSqlite extends Command
         }
 
         try {
-            $this->pdoStatement = $pdo->prepare($sql);
+            $this->pdoStatement = $pdo?->prepare($sql);
             $this->bindPendingParams();
         } catch (PDOException $e) {
             $message = $e->getMessage() . "\nFailed to prepare SQL: $sql";
@@ -130,9 +130,9 @@ final class CommandPDOSqlite extends Command
                     && $this->isolationLevel !== null
                     && $this->db->getTransaction() === null
                 ) {
-                    $this->db->transaction(fn ($rawSql) => $this->internalExecute($rawSql), $this->isolationLevel);
+                    $this->db->transaction(fn (?string $rawSql) => $this->internalExecute($rawSql), $this->isolationLevel);
                 } else {
-                    $this->pdoStatement->execute();
+                    $this->pdoStatement?->execute();
                 }
                 break;
             } catch (\Exception $e) {
@@ -197,7 +197,7 @@ final class CommandPDOSqlite extends Command
     }
 
     /**
-     * Splits the specified SQL code into individual SQL statements and returns them or `false` if there's a single
+     * Splits the specified SQL codes into individual SQL statements and returns them or `false` if there's a single
      * statement.
      *
      * @param string $sql
@@ -210,7 +210,7 @@ final class CommandPDOSqlite extends Command
      * @psalm-param array<string, string> $params
      * @psalm-return false|list<array{0: string, 1: array}>
      */
-    private function splitStatements(string $sql, array $params)
+    private function splitStatements(string $sql, array $params): bool|array
     {
         $semicolonIndex = strpos($sql, ';');
 

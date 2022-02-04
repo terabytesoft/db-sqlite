@@ -7,7 +7,7 @@ namespace Yiisoft\Db\Sqlite\PDO;
 use Psr\Log\LogLevel;
 use Throwable;
 use Yiisoft\Db\AwareTrait\LoggerAwareTrait;
-use Yiisoft\Db\Connection\ConnectionInterface;
+use Yiisoft\Db\Connection\ConnectionPDOInterface;
 use Yiisoft\Db\Exception\Exception;
 use Yiisoft\Db\Exception\InvalidConfigException;
 use Yiisoft\Db\Exception\NotSupportedException;
@@ -47,17 +47,12 @@ final class TransactionPDOSqlite implements TransactionInterface
 
     private int $level = 0;
 
-    public function __construct(private ConnectionInterface $db)
+    public function __construct(private ConnectionPDOInterface $db)
     {
-        $this->db = $db;
     }
 
     public function begin(?string $isolationLevel = null): void
     {
-        if ($this->db === null) {
-            throw new InvalidConfigException('Transaction::db must be set.');
-        }
-
         $this->db->open();
 
         if ($this->level === 0) {
@@ -65,15 +60,12 @@ final class TransactionPDOSqlite implements TransactionInterface
                 $this->db->getSchema()->setTransactionIsolationLevel($isolationLevel);
             }
 
-            if ($this->logger !== null) {
-                $this->logger->log(
-                    LogLevel::DEBUG,
-                    'Begin transaction' . ($isolationLevel ? ' with isolation level ' . $isolationLevel : '')
-                    . ' ' . __METHOD__
-                );
-            }
-
-            $this->db->getPDO()->beginTransaction();
+            $this->logger?->log(
+                LogLevel::DEBUG,
+                'Begin transaction' . ($isolationLevel ? ' with isolation level ' . $isolationLevel : '')
+                . ' ' . __METHOD__
+            );
+            $this->db->getPDO()?->beginTransaction();
             $this->level = 1;
 
             return;
@@ -82,19 +74,13 @@ final class TransactionPDOSqlite implements TransactionInterface
         $schema = $this->db->getSchema();
 
         if ($schema->supportsSavepoint()) {
-            if ($this->logger !== null) {
-                $this->logger->log(LogLevel::DEBUG, 'Set savepoint ' . $this->level . ' ' . __METHOD__);
-            }
-
+            $this->logger?->log(LogLevel::DEBUG, 'Set savepoint ' . $this->level . ' ' . __METHOD__);
             $schema->createSavepoint('LEVEL' . $this->level);
         } else {
-            if ($this->logger !== null) {
-                $this->logger->log(
-                    LogLevel::DEBUG,
-                    'Transaction not started: nested transaction not supported ' . __METHOD__
-                );
-            }
-
+            $this->logger?->log(
+                LogLevel::DEBUG,
+                'Transaction not started: nested transaction not supported ' . __METHOD__
+            );
             throw new NotSupportedException('Transaction not started: nested transaction not supported.');
         }
 
@@ -115,30 +101,21 @@ final class TransactionPDOSqlite implements TransactionInterface
         $this->level--;
 
         if ($this->level === 0) {
-            if ($this->logger !== null) {
-                $this->logger->log(LogLevel::DEBUG, 'Commit transaction ' . __METHOD__);
-            }
-
-            $this->db->getPDO()->commit();
-
+            $this->logger?->log(LogLevel::DEBUG, 'Commit transaction ' . __METHOD__);
+            $this->db->getPDO()?->commit();
             return;
         }
 
         $schema = $this->db->getSchema();
 
         if ($schema->supportsSavepoint()) {
-            if ($this->logger !== null) {
-                $this->logger->log(LogLevel::DEBUG, 'Release savepoint ' . $this->level . ' ' . __METHOD__);
-            }
-
+            $this->logger?->log(LogLevel::DEBUG, 'Release savepoint ' . $this->level . ' ' . __METHOD__);
             $schema->releaseSavepoint('LEVEL' . $this->level);
         } else {
-            if ($this->logger !== null) {
-                $this->logger->log(
-                    LogLevel::INFO,
-                    'Transaction not committed: nested transaction not supported ' . __METHOD__
-                );
-            }
+            $this->logger?->log(
+                LogLevel::INFO,
+                'Transaction not committed: nested transaction not supported ' . __METHOD__
+            );
         }
     }
 
@@ -149,9 +126,12 @@ final class TransactionPDOSqlite implements TransactionInterface
 
     public function isActive(): bool
     {
-        return $this->level > 0 && $this->db && $this->db->isActive();
+        return $this->level > 0 && $this->db->isActive();
     }
 
+    /**
+     * @throws Exception|InvalidConfigException|Throwable
+     */
     public function rollBack(): void
     {
         if (!$this->isActive()) {
@@ -164,29 +144,20 @@ final class TransactionPDOSqlite implements TransactionInterface
 
         $this->level--;
         if ($this->level === 0) {
-            if ($this->logger !== null) {
-                $this->logger->log(LogLevel::INFO, 'Roll back transaction ' . __METHOD__);
-            }
-
-            $this->db->getPDO()->rollBack();
-
+            $this->logger?->log(LogLevel::INFO, 'Roll back transaction ' . __METHOD__);
+            $this->db->getPDO()?->rollBack();
             return;
         }
 
         $schema = $this->db->getSchema();
         if ($schema->supportsSavepoint()) {
-            if ($this->logger !== null) {
-                $this->logger->log(LogLevel::DEBUG, 'Roll back to savepoint ' . $this->level . ' ' . __METHOD__);
-            }
-
+            $this->logger?->log(LogLevel::DEBUG, 'Roll back to savepoint ' . $this->level . ' ' . __METHOD__);
             $schema->rollBackSavepoint('LEVEL' . $this->level);
         } else {
-            if ($this->logger !== null) {
-                $this->logger->log(
-                    LogLevel::INFO,
-                    'Transaction not rolled back: nested transaction not supported ' . __METHOD__
-                );
-            }
+            $this->logger?->log(
+                LogLevel::INFO,
+                'Transaction not rolled back: nested transaction not supported ' . __METHOD__
+            );
         }
     }
 
@@ -196,13 +167,10 @@ final class TransactionPDOSqlite implements TransactionInterface
             throw new Exception('Failed to set isolation level: transaction was inactive.');
         }
 
-        if ($this->logger !== null) {
-            $this->logger->log(
-                LogLevel::DEBUG,
-                'Setting transaction isolation level to ' . $this->level . ' ' . __METHOD__
-            );
-        }
-
+        $this->logger?->log(
+            LogLevel::DEBUG,
+            'Setting transaction isolation level to ' . $this->level . ' ' . __METHOD__
+        );
         $this->db->getSchema()->setTransactionIsolationLevel($level);
     }
 }
