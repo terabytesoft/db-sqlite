@@ -14,6 +14,7 @@ use Yiisoft\Db\Exception\InvalidArgumentException;
 use Yiisoft\Db\Query\QueryBuilderInterface;
 use Yiisoft\Db\Schema\QuoterInterface;
 use Yiisoft\Db\Schema\SchemaInterface;
+use Yiisoft\Db\Sqlite\DDLCommand;
 use Yiisoft\Db\Sqlite\SqlToken;
 use Yiisoft\Db\Sqlite\SqlTokenizer;
 use Yiisoft\Strings\StringHelper;
@@ -30,10 +31,15 @@ final class CommandPDOSqlite extends Command
         private ConnectionPDOInterface $db,
         QueryBuilderInterface $queryBuilder,
         QueryCache $queryCache,
-        QuoterInterface $quoter,
+        private QuoterInterface $quoter,
         private SchemaInterface $schema
     ) {
         parent::__construct($queryBuilder, $queryCache, $quoter, $schema);
+    }
+
+    public function getDDLCommand(): DDLCommand
+    {
+        return new DDLCommand($this->quoter);
     }
 
     public function prepare(?bool $forRead = null): void
