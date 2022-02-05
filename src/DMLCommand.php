@@ -6,6 +6,7 @@ namespace Yiisoft\Db\Sqlite;
 
 use InvalidArgumentException;
 use Throwable;
+use Yiisoft\Db\Command\CommandInterface;
 use Yiisoft\Db\Command\DMLCommand as AbstractDMLCommand;
 use Yiisoft\Db\Exception\Exception;
 use Yiisoft\Db\Schema\QuoterInterface;
@@ -17,7 +18,7 @@ final class DMLCommand extends AbstractDMLCommand
         private CommandInterface $command,
         private QuoterInterface $quoter,
         private SchemaInterface $schema
-    ){
+    ) {
         parent::__construct($quoter, $schema);
     }
 

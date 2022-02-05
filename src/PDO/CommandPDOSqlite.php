@@ -45,7 +45,7 @@ final class CommandPDOSqlite extends Command
 
     public function getDMLCommand(): DMLCommand
     {
-        return new DDLCommand($this, $this->quoter, $this->schema);
+        return new DMLCommand($this, $this->quoter, $this->schema);
     }
 
     public function prepare(?bool $forRead = null): void

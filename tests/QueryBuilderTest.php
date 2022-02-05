@@ -91,20 +91,6 @@ final class QueryBuilderTest extends TestCase
         $this->assertEquals('ALTER TABLE `table_from` RENAME TO `table_to`', $sql);
     }
 
-    public function testResetSequence(): void
-    {
-        $db = $this->getConnection(true);
-        $qb = $this->getQueryBuilder($db);
-
-        $expected = "UPDATE sqlite_sequence SET seq='5' WHERE name='item'";
-        $sql = $qb->resetSequence('item');
-        $this->assertEquals($expected, $sql);
-
-        $expected = "UPDATE sqlite_sequence SET seq='3' WHERE name='item'";
-        $sql = $qb->resetSequence('item', 4);
-        $this->assertEquals($expected, $sql);
-    }
-
     public function testAddDropForeignKey(): void
     {
         $this->markTestSkipped('Adding/dropping foreign keys is not supported in SQLite.');
