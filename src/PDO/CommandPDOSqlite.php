@@ -30,7 +30,7 @@ final class CommandPDOSqlite extends Command
 {
     public function __construct(
         private ConnectionPDOInterface $db,
-        QueryBuilderInterface $queryBuilder,
+        private QueryBuilderInterface $queryBuilder,
         QueryCache $queryCache,
         private QuoterInterface $quoter,
         private SchemaInterface $schema
@@ -45,7 +45,7 @@ final class CommandPDOSqlite extends Command
 
     public function getDMLCommand(): DMLCommand
     {
-        return new DMLCommand($this, $this->quoter, $this->schema);
+        return new DMLCommand($this, $this->queryBuilder, $this->quoter, $this->schema);
     }
 
     public function prepare(?bool $forRead = null): void
