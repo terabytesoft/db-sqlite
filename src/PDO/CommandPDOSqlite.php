@@ -14,8 +14,6 @@ use Yiisoft\Db\Exception\InvalidArgumentException;
 use Yiisoft\Db\Query\QueryBuilderInterface;
 use Yiisoft\Db\Schema\QuoterInterface;
 use Yiisoft\Db\Schema\SchemaInterface;
-use Yiisoft\Db\Sqlite\DDLCommand;
-use Yiisoft\Db\Sqlite\DMLCommand;
 use Yiisoft\Db\Sqlite\SqlToken;
 use Yiisoft\Db\Sqlite\SqlTokenizer;
 use Yiisoft\Strings\StringHelper;
@@ -28,24 +26,14 @@ use function strpos;
 
 final class CommandPDOSqlite extends Command
 {
-    public function __construct(
-        private ConnectionPDOInterface $db,
-        private QueryBuilderInterface $queryBuilder,
-        QueryCache $queryCache,
-        private QuoterInterface $quoter,
-        private SchemaInterface $schema
-    ) {
-        parent::__construct($queryBuilder, $queryCache, $quoter, $schema);
+    public function __construct(private ConnectionPDOInterface $db, QueryCache $queryCache)
+    {
+        parent::__construct($queryCache);
     }
 
-    public function getDDLCommand(): DDLCommand
+    public function queryBuilder(): QueryBuilderInterface
     {
-        return new DDLCommand($this->quoter);
-    }
-
-    public function getDMLCommand(): DMLCommand
-    {
-        return new DMLCommand($this, $this->queryBuilder, $this->quoter, $this->schema);
+        return $this->db->getQueryBuilder();
     }
 
     public function prepare(?bool $forRead = null): void
@@ -63,7 +51,7 @@ final class CommandPDOSqlite extends Command
             $forRead = false;
         }
 
-        if ($forRead || ($forRead === null && $this->schema->isReadQuery($sql))) {
+        if ($forRead || ($forRead === null && $this->db->getSchema()->isReadQuery($sql))) {
             $pdo = $this->db->getSlavePdo();
         } else {
             $pdo = $this->db->getMasterPdo();
@@ -147,9 +135,9 @@ final class CommandPDOSqlite extends Command
                     $this->pdoStatement?->execute();
                 }
                 break;
-            } catch (\Exception $e) {
+            } catch (PDOException $e) {
                 $rawSql = $rawSql ?: $this->getRawSql();
-                $e = $this->schema->convertException($e, $rawSql);
+                $e = $this->db->getSchema()->convertException($e, $rawSql);
 
                 if ($this->retryHandler === null || !($this->retryHandler)($e, $attempt)) {
                     throw $e;

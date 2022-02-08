@@ -80,13 +80,7 @@ final class ConnectionPDOSqlite extends Connection implements ConnectionPDOInter
 
     public function createCommand(?string $sql = null, array $params = []): CommandInterface
     {
-        $command = new CommandPDOSqlite(
-            $this,
-            $this->getQueryBuilder(),
-            $this->queryCache,
-            $this->getQuoter(),
-            $this->getSchema()
-        );
+        $command = new CommandPDOSqlite($this, $this->queryCache);
 
         if ($sql !== null) {
             $command->setSql($sql);
@@ -162,7 +156,11 @@ final class ConnectionPDOSqlite extends Connection implements ConnectionPDOInter
     public function getQueryBuilder(): QueryBuilderInterface
     {
         if ($this->queryBuilder === null) {
-            $this->queryBuilder = new QueryBuilderPDOSqlite($this);
+            $this->queryBuilder = new QueryBuilderPDOSqlite(
+                $this->createCommand(),
+                $this->getQuoter(),
+                $this->getSchema(),
+            );
         }
 
         return $this->queryBuilder;
