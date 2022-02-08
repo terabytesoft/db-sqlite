@@ -272,7 +272,7 @@ final class SchemaPDOSqlite extends Schema
             [':tableName' => $tableName],
         )->queryScalar();
 
-        $sql = ($sql === false || $sql === null) ? '' : $sql;
+        $sql = ($sql === false || $sql === null) ? '' : (string) $sql;
 
         /** @var SqlToken[]|SqlToken[][]|SqlToken[][][] $code */
         $code = (new SqlTokenizer($sql))->tokenize();
@@ -778,8 +778,10 @@ final class SchemaPDOSqlite extends Schema
      */
     public function getLastInsertID(string $sequenceName = ''): string
     {
-        if ($this->db->isActive()) {
-            return $this->db->getPDO()->lastInsertId(
+        $pdo = $this->db->getPDO();
+
+        if ($pdo !== null && $this->db->isActive()) {
+            return $pdo->lastInsertId(
                 $sequenceName === '' ? null : $this->db->getQuoter()->quoteTableName($sequenceName)
             );
         }

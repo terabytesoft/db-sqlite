@@ -7,8 +7,10 @@ namespace Yiisoft\Db\Sqlite;
 use Generator;
 use InvalidArgumentException;
 use Throwable;
+use Yiisoft\Db\Constraint\Constraint;
 use Yiisoft\Db\Exception\Exception;
 use Yiisoft\Db\Expression\Expression;
+use Yiisoft\Db\Expression\ExpressionInterface;
 use Yiisoft\Db\Query\DMLQueryBuilder as AbstractDMLQueryBuilder;
 use Yiisoft\Db\Query\Query;
 use Yiisoft\Db\Query\QueryBuilderInterface;
@@ -20,7 +22,7 @@ final class DMLQueryBuilder extends AbstractDMLQueryBuilder
         parent::__construct($queryBuilder);
     }
 
-    public function resetSequence(string $tableName, $value = null): string
+    public function resetSequence(string $tableName, mixed $value = null): string
     {
         $table = $this->queryBuilder->schema()->getTableSchema($tableName);
 

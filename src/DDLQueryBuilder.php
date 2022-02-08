@@ -48,7 +48,7 @@ final class DDLQueryBuilder extends AbstractDDLQueryBuilder
         throw new NotSupportedException(__METHOD__ . ' is not supported by SQLite.');
     }
 
-    public function addUnique(string $name, string $table, $columns): string
+    public function addUnique(string $name, string $table, array|string $columns): string
     {
         throw new NotSupportedException(__METHOD__ . ' is not supported by SQLite.');
     }
@@ -63,7 +63,7 @@ final class DDLQueryBuilder extends AbstractDDLQueryBuilder
         return 'PRAGMA foreign_keys=' . (int) $check;
     }
 
-    public function createIndex(string $name, string $table, $columns, bool $unique = false): string
+    public function createIndex(string $name, string $table, array|string $columns, bool $unique = false): string
     {
         $tableParts = explode('.', $table);
 

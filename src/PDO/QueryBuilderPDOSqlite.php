@@ -99,7 +99,7 @@ final class QueryBuilderPDOSqlite extends QueryBuilder
         return $this->ddlBuilder->addPrimaryKey($name, $table, $columns);
     }
 
-    public function addUnique(string $name, string $table, $columns): string
+    public function addUnique(string $name, string $table, array|string $columns): string
     {
         return $this->ddlBuilder->addUnique($name, $table, $columns);
     }
