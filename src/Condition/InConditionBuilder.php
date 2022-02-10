@@ -62,7 +62,7 @@ final class InConditionBuilder extends BaseInConditionBuilder
         /** @psalm-var array<array-key, string>|Traversable $columns */
         foreach ($columns as $i => $column) {
             $quotedColumns[$i] = strpos($column, '(') === false
-                ? $this->queryBuilder->getQuoter()->quoteColumnName($column) : $column;
+                ? $this->queryBuilder->quoter()->quoteColumnName($column) : $column;
         }
 
         $vss = [];
