@@ -11,7 +11,7 @@ use Yiisoft\Db\Exception\InvalidConfigException;
 use Yiisoft\Db\Exception\NotSupportedException;
 use Yiisoft\Db\Query\Conditions\InConditionBuilder as BaseInConditionBuilder;
 use Yiisoft\Db\Query\Query;
-use Yiisoft\Db\Query\QueryBuilder;
+use Yiisoft\Db\Query\QueryBuilderInterface;
 
 use function implode;
 use function is_array;
@@ -19,11 +19,9 @@ use function strpos;
 
 final class InConditionBuilder extends BaseInConditionBuilder
 {
-    protected QueryBuilder $queryBuilder;
-
-    public function __construct(QueryBuilder $queryBuilder)
+    public function __construct(private QueryBuilderInterface $queryBuilder)
     {
-        $this->queryBuilder = $queryBuilder;
+        parent::__construct($queryBuilder);
     }
 
     /**
